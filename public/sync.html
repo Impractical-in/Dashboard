@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Backup & Sync</title>
-    <link rel="stylesheet" href="sync.css" />
+    <link rel="stylesheet" href="../css/sync.css" />
   </head>
   <body>
     <header class="topbar">
@@ -17,38 +17,18 @@
 
     <main class="stack">
       <section class="card">
-        <div class="section-title">Google Drive</div>
-        <div class="status" id="syncStatus">Not connected</div>
-        <div class="status success" id="syncSuccess" hidden>Backup successful</div>
-        <div class="actions">
-          <button class="btn primary" id="connectBtn" type="button">Connect Google Drive</button>
-          <button class="btn" id="backupBtn" type="button">Backup now</button>
-          <button class="btn" id="restoreBtn" type="button">Restore</button>
-        </div>
-        <div class="field">
-          <span>Auto backup</span>
-          <div class="actions">
-            <label class="toggle">
-              <input id="autoBackup" type="checkbox" />
-              <span>Enable</span>
-            </label>
-            <select id="backupInterval">
-              <option value="6">Every 6 hours</option>
-              <option value="12">Every 12 hours</option>
-              <option value="24" selected>Every 24 hours</option>
-            </select>
-          </div>
-        </div>
-        <div class="hint">First time you connect, a Google consent window will open. Data is stored in your Drive appDataFolder (hidden).</div>
-      </section>
-
-      <section class="card">
         <div class="section-title">Local auto backup (Chromium)</div>
         <div class="status" id="localStatus">No backup file selected</div>
         <div class="status success" id="localSuccess" hidden>Backup successful</div>
         <div class="actions">
-          <button class="btn primary" id="chooseLocalFileBtn" type="button">Choose backup file</button>
-          <button class="btn" id="localSaveBtn" type="button">Save snapshot now</button>
+          <button class="btn primary" id="chooseLocalFileBtn" type="button">
+            Choose backup file
+            <span class="btn-sub" id="lastSavedLabel">Never</span>
+          </button>
+          <button class="btn" id="localSaveBtn" type="button">
+            Save snapshot now
+            <span class="btn-sub" id="lastBackupLabel">Never</span>
+          </button>
         </div>
         <div class="field">
           <span>Auto snapshot</span>
@@ -58,8 +38,11 @@
               <span>Enable</span>
             </label>
             <select id="localBackupInterval">
-              <option value="6">Every 6 hours</option>
+              <option value="1">Every 1 hour</option>
+              <option value="2">Every 2 hours</option>
+              <option value="5">Every 5 hours</option>
               <option value="12">Every 12 hours</option>
+              <option value="20">Every 20 hours</option>
               <option value="24" selected>Every 24 hours</option>
             </select>
           </div>
@@ -79,8 +62,8 @@
       </section>
     </main>
 
-    <script src="storage.js"></script>
-    <script src="sync.js"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="../js/storage.js"></script>
+    <script src="../js/sync.js"></script>
   </body>
 </html>
+

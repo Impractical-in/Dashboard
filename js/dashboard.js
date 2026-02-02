@@ -479,7 +479,7 @@ if (previewTargets.length) {
   window.addEventListener("storage", renderAllPreviews);
 }
 
-const footerVersion = document.querySelector(".footer");
+const footerVersion = document.getElementById("appVersion");
 if (footerVersion && typeof window !== "undefined" && window.APP_VERSION) {
   footerVersion.textContent = `v${window.APP_VERSION}`;
 }

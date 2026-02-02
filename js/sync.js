@@ -13,6 +13,8 @@ const chooseLocalFileBtn = document.getElementById("chooseLocalFileBtn");
 const localSaveBtn = document.getElementById("localSaveBtn");
 const localAutoToggle = document.getElementById("localAutoBackup");
 const localInterval = document.getElementById("localBackupInterval");
+const lastSavedLabel = document.getElementById("lastSavedLabel");
+const lastBackupLabel = document.getElementById("lastBackupLabel");
 
 const OAUTH_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
@@ -32,11 +34,21 @@ let pendingAutoBackup = false;
 let localHandle = null;
 
 function updateStatus(message) {
-  syncStatus.textContent = message;
+  if (syncStatus) syncStatus.textContent = message;
 }
 
 function updateLocalStatus(message) {
   if (localStatus) localStatus.textContent = message;
+}
+
+function updateLastLabels() {
+  const lastLocal = localStorage.getItem(LOCAL_LAST_SNAPSHOT_KEY);
+  if (lastSavedLabel) {
+    lastSavedLabel.textContent = lastLocal ? new Date(lastLocal).toLocaleString() : "Never";
+  }
+  if (lastBackupLabel) {
+    lastBackupLabel.textContent = lastLocal ? new Date(lastLocal).toLocaleString() : "Never";
+  }
 }
 
 function showSuccess(el) {
@@ -53,19 +65,20 @@ function getLocalKeys() {
   return Object.keys(localStorage).filter((key) => !key.startsWith("__"));
 }
 
-function exportSnapshot() {
+async function buildSnapshot() {
   const meta = loadData("appMeta", {});
   const data = {};
   getLocalKeys().forEach((key) => {
     data[key] = loadData(key, null);
   });
-  return {
+  const payload = {
     version: 1,
     appVersion: meta.version || (typeof window !== "undefined" ? window.APP_VERSION : ""),
     lastSavedAt: meta.lastSavedAt || null,
     exportedAt: new Date().toISOString(),
     data,
   };
+  return payload;
 }
 
 function openHandleDb() {
@@ -131,13 +144,13 @@ async function chooseLocalFile() {
   updateLocalStatus("Backup file selected");
 }
 
-async function writeSnapshotToHandle(handle) {
-  const snapshot = exportSnapshot();
+async function writeSnapshotToHandle(handle, snapshot) {
   const writable = await handle.createWritable();
   await writable.write(JSON.stringify(snapshot, null, 2));
   await writable.close();
   localStorage.setItem(LOCAL_LAST_SNAPSHOT_KEY, snapshot.exportedAt);
   updateLocalStatus(`Last snapshot: ${new Date(snapshot.exportedAt).toLocaleString()}`);
+  updateLastLabels();
 }
 
 async function localSaveNow() {
@@ -150,11 +163,12 @@ async function localSaveNow() {
     updateLocalStatus("Permission denied.");
     return;
   }
-  await writeSnapshotToHandle(localHandle);
+  const snapshot = await buildSnapshot();
+  await writeSnapshotToHandle(localHandle, snapshot);
   showSuccess(localSuccess);
 }
 
-function applySnapshot(snapshot) {
+async function applySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || !snapshot.data) return false;
   const incomingKeys = new Set(Object.keys(snapshot.data));
   getLocalKeys().forEach((key) => {
@@ -290,7 +304,7 @@ async function updateBackupFile(token, fileId, snapshot) {
 
 async function backupNow() {
   const token = await requireToken();
-  const snapshot = exportSnapshot();
+  const snapshot = await buildSnapshot();
   let fileId = await findBackupFile(token);
   if (!fileId) {
     fileId = await createBackupFile(token, snapshot);
@@ -322,18 +336,21 @@ async function restoreNow() {
   let fileId = await findBackupFile(token);
   if (!fileId) throw new Error("Backup file not found");
   const snapshot = await downloadSnapshot(token, fileId);
-  const applied = applySnapshot(snapshot);
+  const applied = await applySnapshot(snapshot);
   if (!applied) throw new Error("Invalid snapshot");
   updateStatus("Restore complete");
 }
 
-function exportToFile() {
-  const snapshot = exportSnapshot();
+async function exportToFile() {
+  const snapshot = await buildSnapshot();
   const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[:.]/g, "-");
   link.href = url;
-  link.download = "dashboard-backup.json";
+  link.download = `dashboard_backup_${stamp}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -343,8 +360,8 @@ function importFromFile(file) {
   reader.onload = () => {
     try {
       const snapshot = JSON.parse(reader.result);
-      initStorage().then(() => {
-        const applied = applySnapshot(snapshot);
+      initStorage().then(async () => {
+        const applied = await applySnapshot(snapshot);
         if (applied) updateStatus("Import complete");
       });
     } catch (err) {
@@ -383,18 +400,24 @@ function scheduleLocalAutoBackup(hours) {
   }, intervalMs);
 }
 
-connectBtn.addEventListener("click", () => {
-  pendingAutoBackup = true;
-  requireToken().catch(() => updateStatus("Connection failed"));
-});
+if (connectBtn) {
+  connectBtn.addEventListener("click", () => {
+    pendingAutoBackup = true;
+    requireToken().catch(() => updateStatus("Connection failed"));
+  });
+}
 
-backupBtn.addEventListener("click", () => {
-  backupNow().catch(() => updateStatus("Backup failed"));
-});
+if (backupBtn) {
+  backupBtn.addEventListener("click", () => {
+    backupNow().catch(() => updateStatus("Backup failed"));
+  });
+}
 
-restoreBtn.addEventListener("click", () => {
-  restoreNow().catch(() => updateStatus("Restore failed"));
-});
+if (restoreBtn) {
+  restoreBtn.addEventListener("click", () => {
+    restoreNow().catch(() => updateStatus("Restore failed"));
+  });
+}
 
 exportBtn.addEventListener("click", exportToFile);
 importInput.addEventListener("change", (event) => {
@@ -429,16 +452,20 @@ if (localInterval) {
   });
 }
 
-autoBackupToggle.addEventListener("change", () => {
-  localStorage.setItem(AUTO_ENABLED_KEY, String(autoBackupToggle.checked));
-  if (autoBackupToggle.checked) {
-    scheduleAutoBackup(Number(backupInterval.value));
-  }
-});
+if (autoBackupToggle) {
+  autoBackupToggle.addEventListener("change", () => {
+    localStorage.setItem(AUTO_ENABLED_KEY, String(autoBackupToggle.checked));
+    if (autoBackupToggle.checked) {
+      scheduleAutoBackup(Number(backupInterval.value));
+    }
+  });
+}
 
-backupInterval.addEventListener("change", () => {
-  localStorage.setItem(AUTO_INTERVAL_KEY, backupInterval.value);
-});
+if (backupInterval) {
+  backupInterval.addEventListener("change", () => {
+    localStorage.setItem(AUTO_INTERVAL_KEY, backupInterval.value);
+  });
+}
 
 initStorage().then(() => {
   initTokenClient();
@@ -459,10 +486,7 @@ initStorage().then(() => {
     localInterval.value = String(localHours);
     scheduleLocalAutoBackup(localHours);
   }
-  const lastLocal = localStorage.getItem(LOCAL_LAST_SNAPSHOT_KEY);
-  if (lastLocal) {
-    updateLocalStatus(`Last snapshot: ${new Date(lastLocal).toLocaleString()}`);
-  }
+  updateLastLabels();
   loadHandle()
     .then((handle) => {
       if (handle) {

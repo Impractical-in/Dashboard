@@ -23,6 +23,8 @@ body {
   color: var(--text);
   min-height: 100vh;
   background-image: var(--bg-accent);
+  display: flex;
+  flex-direction: column;
 }
 
 button,
@@ -64,6 +66,28 @@ option {
   gap: 24px;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   padding: 28px;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 16px 28px 22px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.footer-link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+.footer-divider {
+  margin: 0 8px;
+  color: var(--muted);
 }
 
 .timebar {

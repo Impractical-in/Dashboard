@@ -66,6 +66,18 @@ function normalizeEntries(items) {
       copy.linkedItems = [];
       migrated = true;
     }
+    if (!Array.isArray(copy.history)) {
+      copy.history = [];
+      migrated = true;
+    }
+    if (!copy.createdAt) {
+      copy.createdAt = new Date().toISOString();
+      migrated = true;
+    }
+    if (!copy.updatedAt) {
+      copy.updatedAt = copy.createdAt;
+      migrated = true;
+    }
     return copy;
   });
 
@@ -122,6 +134,41 @@ function parseTags(value) {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function trackChanges(entry, updates) {
+  const changes = [];
+  Object.entries(updates).forEach(([key, nextValue]) => {
+    const prevValue = entry[key];
+    const prev = Array.isArray(prevValue) ? [...prevValue] : prevValue;
+    const next = Array.isArray(nextValue) ? [...nextValue] : nextValue;
+    const same = JSON.stringify(prev) === JSON.stringify(next);
+    if (!same) {
+      changes.push({ field: key, from: prev, to: next });
+    }
+  });
+  if (changes.length > 0) {
+    entry.history = Array.isArray(entry.history) ? entry.history : [];
+    entry.history.unshift({
+      at: new Date().toISOString(),
+      changes,
+    });
+  }
+}
+
+function renderHistory(entry) {
+  if (!Array.isArray(entry.history) || entry.history.length === 0) {
+    return `<div class="entry-meta">No edit history yet.</div>`;
+  }
+  const items = entry.history
+    .slice(0, 20)
+    .map((log) => {
+      const time = new Date(log.at).toLocaleString();
+      const fields = log.changes.map((c) => c.field).join(", ");
+      return `<div class="history-item"><span>${time}</span><span>${fields}</span></div>`;
+    })
+    .join("");
+  return `<div class="history-list">${items}</div>`;
 }
 
 function loadLinkItems() {
@@ -628,6 +675,7 @@ function renderEntries() {
 
     const showDelete = editingId === entry.id ? "" : "hidden";
     const tagValue = Array.isArray(entry.tags) ? entry.tags.join(", ") : "";
+    const historyHtml = renderHistory(entry);
     item.innerHTML = `
       <div class="entry-header" data-id="${entry.id}">
         <div class="entry-title">
@@ -687,6 +735,10 @@ function renderEntries() {
           <span>End date</span>
           <input data-end="${entry.id}" type="date" value="${entry.endDate || ""}" />
         </label>
+        <div class="field">
+          <span>Edit history</span>
+          ${historyHtml}
+        </div>
         ${linksHtml}
         <div class="entry-actions">
           <button class="btn" data-save="${entry.id}" type="button">Save</button>
@@ -713,12 +765,15 @@ function addEntry(event) {
     tags: parseTags(tagsInput.value),
     linkedItems: [...currentLinks],
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    history: [],
     workSegments: [],
     scheduleDays: [],
   };
 
   if (!entry.title || !entry.startDate) return;
   entries.unshift(entry);
+  trackChanges(entry, { title: entry.title, notes: entry.notes, startDate: entry.startDate, endDate: entry.endDate });
   saveEntries();
   renderEntries();
   form.reset();
@@ -774,11 +829,20 @@ entriesList.addEventListener("click", (event) => {
     const tags = entriesList.querySelector(`[data-tags="${entryId}"]`);
     const entry = entries.find((item) => item.id === entryId);
     if (entry) {
-      entry.notes = notes ? notes.value.trim() : "";
-      entry.links = links ? links.value.trim() : "";
-      entry.startDate = start ? start.value : "";
-      entry.endDate = end ? end.value : "";
-      entry.tags = tags ? parseTags(tags.value) : [];
+      const updates = {
+        notes: notes ? notes.value.trim() : "",
+        links: links ? links.value.trim() : "",
+        startDate: start ? start.value : "",
+        endDate: end ? end.value : "",
+        tags: tags ? parseTags(tags.value) : [],
+      };
+      trackChanges(entry, updates);
+      entry.notes = updates.notes;
+      entry.links = updates.links;
+      entry.startDate = updates.startDate;
+      entry.endDate = updates.endDate;
+      entry.tags = updates.tags;
+      entry.updatedAt = new Date().toISOString();
       saveEntries();
       renderEntries();
     }
@@ -800,6 +864,7 @@ entriesList.addEventListener("click", (event) => {
           end: end.toISOString(),
           source: "manual",
         });
+        entry.updatedAt = new Date().toISOString();
         saveEntries();
         renderEntries();
       }
@@ -812,6 +877,7 @@ entriesList.addEventListener("click", (event) => {
     const entry = entries.find((item) => item.id === entryId);
     if (entry && Array.isArray(entry.workSegments) && Number.isFinite(index)) {
       entry.workSegments.splice(index, 1);
+      entry.updatedAt = new Date().toISOString();
       saveEntries();
       renderEntries();
     }
@@ -828,6 +894,7 @@ entriesList.addEventListener("click", (event) => {
       } else {
         entry.scheduleDays = [...entry.scheduleDays, dayIndex].sort();
       }
+      entry.updatedAt = new Date().toISOString();
       saveEntries();
       renderEntries();
     }

@@ -194,7 +194,7 @@ function renderArchive() {
     archiveList.innerHTML = `<div class="task">No archived tasks.</div>`;
     return;
   }
-  const sorted = sortTasks(archive);
+  const sorted = sortTasks(archive).slice(0, 30);
   sorted.forEach((task) => {
     const item = document.createElement("div");
     item.className = "task";
@@ -368,8 +368,9 @@ taskList.addEventListener("click", (event) => {
           archive.unshift({ ...task, completedAt: new Date().toISOString() });
           saveArchive();
         }
+        tasks = tasks.filter((item) => item.id !== task.id);
+        saveTasks();
       }
-      saveTasks();
       renderTasks();
       renderArchive();
     }
@@ -406,6 +407,10 @@ initStorage().then(() => {
       }
     }
   });
+  if (tasks.some((task) => task.done)) {
+    tasks = tasks.filter((task) => !task.done);
+    saveTasks();
+  }
   if (archiveUpdated) saveArchive();
   const today = new Date();
   scheduleDateInput.value = today.toISOString().slice(0, 10);

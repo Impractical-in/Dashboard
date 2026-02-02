@@ -1,10 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>To-Do List</title>
-    <link rel="stylesheet" href="todo.css" />
+    <link rel="stylesheet" href="../css/todo.css" />
   </head>
   <body>
     <header class="topbar">
@@ -71,9 +71,9 @@
         <div class="section-title">Your tasks</div>
         <div class="section-title">Scheduled for</div>
         <div class="schedule-row">
-          <button class="btn" id="prevScheduleDay" type="button">◀</button>
+          <button class="btn" id="prevScheduleDay" type="button">â—€</button>
           <input id="scheduleDate" type="date" />
-          <button class="btn" id="nextScheduleDay" type="button">▶</button>
+          <button class="btn" id="nextScheduleDay" type="button">â–¶</button>
         </div>
         <div class="week-row" id="scheduleWeek"></div>
         <div class="schedule-list" id="scheduledList"></div>
@@ -98,7 +98,8 @@
       </section>
     </main>
 
-    <script src="storage.js"></script>
-    <script src="todo.js"></script>
+    <script src="../js/storage.js"></script>
+    <script src="../js/todo.js"></script>
   </body>
 </html>
+
