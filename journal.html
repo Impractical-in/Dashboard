@@ -1,0 +1,66 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Journal</title>
+    <link rel="stylesheet" href="journal.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Journal</div>
+        <div class="subtitle">Capture ideas and link them to your work</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="stack">
+      <section class="card collapsible-card">
+        <div class="card-header">
+          <div class="section-title">Daily entry</div>
+          <button class="btn icon" id="journalFormToggle" type="button" aria-expanded="false">+</button>
+        </div>
+        <div class="collapsible collapsed" id="journalFormWrap">
+          <div class="date-nav">
+            <button class="btn" id="prevDay" type="button">â—€</button>
+            <input id="entryDate" type="date" />
+            <button class="btn" id="nextDay" type="button">â–¶</button>
+          </div>
+          <form id="journalForm" class="form">
+            <label class="field">
+              <span>Title</span>
+              <input id="entryTitle" type="text" placeholder="Today in one line" />
+            </label>
+            <label class="field">
+              <span>Details</span>
+              <textarea id="entryBody" rows="8" placeholder="What do you want to do? What did you do?"></textarea>
+            </label>
+            <div class="suggestions" id="suggestions"></div>
+            <label class="field">
+              <span>Tags (comma separated)</span>
+              <input id="entryTags" type="text" placeholder="reflection, deep work, notes" />
+            </label>
+            <div class="field">
+              <span>Linked items</span>
+              <div id="linkedItems" class="linked-items"></div>
+            </div>
+            <button class="btn primary" type="submit">Save entry</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Recent entries</div>
+        <div class="filters">
+          <input id="searchInput" type="search" placeholder="Search entries..." />
+          <button class="btn" id="refreshLinks" type="button">Refresh items</button>
+        </div>
+        <div id="entriesList" class="entries"></div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="journal.js"></script>
+  </body>
+</html>

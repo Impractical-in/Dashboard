@@ -1,0 +1,70 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hobbies Tracker</title>
+    <link rel="stylesheet" href="hobbies.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Hobbies Tracker</div>
+        <div class="subtitle">Long-press a tile to mark it complete</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="stack">
+      <section class="card collapsible-card">
+        <div class="card-header">
+          <div class="section-title">Add a hobby</div>
+          <button class="btn icon" id="hobbyFormToggle" type="button" aria-expanded="false">+</button>
+        </div>
+        <div class="collapsible collapsed" id="hobbyFormWrap">
+          <form id="hobbyForm" class="form">
+          <label class="field">
+            <span>Hobby name</span>
+            <input id="hobbyName" type="text" placeholder="Hobby name" required />
+          </label>
+          <label class="field">
+            <span>Type</span>
+            <select id="hobbyType">
+              <option value="music">Music</option>
+              <option value="fitness">Fitness</option>
+              <option value="art">Art</option>
+              <option value="learning">Learning</option>
+              <option value="mindfulness">Mindfulness</option>
+              <option value="craft">Craft</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Custom icon (emoji)</span>
+            <input id="hobbyIcon" type="text" placeholder="icon" />
+          </label>
+          <label class="field">
+            <span>Approx time (minutes)</span>
+            <input id="hobbyTime" type="number" min="5" max="480" value="30" />
+          </label>
+          <button class="btn primary" type="submit">Save hobby</button>
+          <div class="form-actions">
+            <button class="btn hidden" id="hobbyDelete" type="button">Delete hobby</button>
+            <button class="btn" id="hobbyCancel" type="button">Cancel edit</button>
+          </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Your hobbies</div>
+        <div class="hint">Tip: long-press a card to mark today as complete.</div>
+        <div id="hobbyGrid" class="hobby-grid"></div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="hobbies.js"></script>
+  </body>
+</html>
+

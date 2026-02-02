@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Pomodoro</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <div class="title">Local Pomodoro</div>
+          <div class="subtitle">Focused sessions with a simple log</div>
+        </div>
+      </div>
+      <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+        Toggle theme
+      </button>
+    </header>
+
+    <main class="grid">
+      <section class="card timer-card">
+        <div class="timer-head">
+          <div>
+            <div class="label">Session</div>
+            <div id="sessionType" class="session-type">Work</div>
+          </div>
+          <div class="timer-actions">
+            <button id="startBtn" class="btn primary" type="button">Start</button>
+            <button id="pauseBtn" class="btn" type="button" disabled>Pause</button>
+            <button id="resetBtn" class="btn" type="button">Reset</button>
+          </div>
+        </div>
+
+        <div class="timer-body">
+          <canvas id="hourglass" width="220" height="280" aria-label="Sand clock"></canvas>
+          <div class="time-display">
+            <div id="timeLeft" class="time">25:00</div>
+            <div class="pill">
+              <span id="progressText">0%</span> complete
+            </div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <label class="field">
+            <span>Work (minutes)</span>
+            <input id="workMinutes" type="number" min="1" max="180" value="25" />
+          </label>
+          <label class="field">
+            <span>Short break (minutes)</span>
+            <input id="breakMinutes" type="number" min="1" max="60" value="5" />
+          </label>
+          <label class="field">
+            <span>Project or learning</span>
+            <select id="projectSelect"></select>
+          </label>
+          <button id="refreshProjects" class="btn" type="button">Refresh projects</button>
+          <div class="help">If the list is empty, open via a local server so storage is shared.</div>
+        </div>
+
+        <div class="note-area">
+          <label class="field">
+            <span>Notes for this session</span>
+            <textarea id="sessionNotes" rows="3" placeholder="What did you work on?"></textarea>
+          </label>
+          <div class="audio-controls">
+            <label class="field">
+              <span>Pomodoro audio file (relative path)</span>
+              <input id="audioFile" type="text" value="sounds/rain.mp3" />
+            </label>
+            <label class="field inline">
+              <input id="audioEnabled" type="checkbox" checked />
+              <span>Play audio during work sessions</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card log-card">
+        <div class="log-head">
+          <div>
+            <div class="label">Pomodoro Log</div>
+            <div class="subtitle">Stored in your browser (localStorage)</div>
+          </div>
+          <div class="timer-actions">
+            <button id="exportBtn" class="btn" type="button">Export JSON</button>
+            <button id="clearBtn" class="btn danger" type="button">Clear All</button>
+          </div>
+        </div>
+
+        <div class="log-filters">
+          <input id="searchInput" class="search" type="search" placeholder="Search notes..." />
+          <select id="typeFilter">
+            <option value="all">All sessions</option>
+            <option value="Work">Work</option>
+            <option value="Short Break">Short Break</option>
+          </select>
+        </div>
+
+        <div class="log-list" id="logList" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Tip: host on your LAN with any static server (ex: `python -m http.server`).
+    </footer>
+
+    <script src="storage.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

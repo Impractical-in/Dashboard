@@ -1,0 +1,88 @@
+﻿<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Dashboard</title>
+    <link rel="stylesheet" href="dashboard.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Local Dashboard</div>
+        <div class="subtitle">Focus, projects, and learning in one place</div>
+      </div>
+      <button id="timeToggle" class="timebar" type="button" aria-expanded="false">
+        <div id="localDateTime" class="time-text"></div>
+      </button>
+    </header>
+
+    <main class="grid">
+      <a class="tile link-tile todo" href="todo.html">
+        <div class="tile-icon">TD</div>
+        <div class="tile-body">
+          <div class="tile-title">To-Do List</div>
+          <div class="tile-subtitle">Priorities, due dates, and quick picks</div>
+          <div class="tile-preview" data-preview="todo"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile pomodoro" href="pomodoro.html">
+        <div class="tile-icon">PM</div>
+        <div class="tile-body">
+          <div class="tile-title">Pomodoro Timer</div>
+          <div class="tile-subtitle">Open the session timer and log</div>
+          <div class="tile-preview" data-preview="pomodoro"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile projects" href="projects.html">
+        <div class="tile-icon">PR</div>
+        <div class="tile-body">
+          <div class="tile-title">Projects + Learning</div>
+          <div class="tile-subtitle">Plan, track, and take notes</div>
+          <div class="tile-preview" data-preview="projects"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile hobbies" href="hobbies.html">
+        <div class="tile-icon">HB</div>
+        <div class="tile-body">
+          <div class="tile-title">Hobbies Tracker</div>
+          <div class="tile-subtitle">Streaks, time estimates, and progress</div>
+          <div class="tile-preview" data-preview="hobbies"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile journal" href="journal.html">
+        <div class="tile-icon">JR</div>
+        <div class="tile-body">
+          <div class="tile-title">Journal</div>
+          <div class="tile-subtitle">Ideas with linked context</div>
+          <div class="tile-preview" data-preview="journal"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile calendar" href="calendar.html">
+        <div class="tile-icon">CL</div>
+        <div class="tile-body">
+          <div class="tile-title">Calendar</div>
+          <div class="tile-subtitle">Tasks, hobbies, and schedules</div>
+          <div class="tile-preview" data-preview="calendar"></div>
+        </div>
+      </a>
+
+      <a class="tile link-tile links" href="links.html">
+        <div class="tile-icon">LN</div>
+        <div class="tile-body">
+          <div class="tile-title">Quick Links</div>
+          <div class="tile-subtitle">Editable shortcuts</div>
+          <div class="tile-preview" data-preview="links"></div>
+        </div>
+      </a>
+    </main>
+    <div id="timePanel" class="time-panel hidden" aria-live="polite"></div>
+    <script src="storage.js"></script>
+    <script src="dashboard.js"></script>
+  </body>
+</html>

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Calendar</title>
+    <link rel="stylesheet" href="calendar.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Calendar</div>
+        <div class="subtitle">Scheduled tasks, projects, and hobbies</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="card">
+      <div class="calendar-head">
+        <button class="btn" id="prevPeriod" type="button">◀</button>
+        <div id="monthLabel" class="month-label"></div>
+        <button class="btn" id="nextPeriod" type="button">▶</button>
+        <div class="view-toggle">
+          <button class="btn" id="monthViewBtn" type="button">Month</button>
+          <button class="btn" id="weekViewBtn" type="button">Week</button>
+        </div>
+      </div>
+      <div class="weekdays">
+        <span>Mon</span>
+        <span>Tue</span>
+        <span>Wed</span>
+        <span>Thu</span>
+        <span>Fri</span>
+        <span>Sat</span>
+        <span>Sun</span>
+      </div>
+      <div id="calendarGrid" class="calendar-grid"></div>
+      <div id="weekView" class="week-view hidden"></div>
+    </main>
+
+    <section class="card day-panel">
+      <div class="section-title">Day details</div>
+      <div id="dayDetails" class="day-details"></div>
+    </section>
+
+    <script src="storage.js"></script>
+    <script src="calendar.js"></script>
+  </body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quick Links</title>
+    <link rel="stylesheet" href="links.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Quick Links</div>
+        <div class="subtitle">Editable shortcuts with custom labels</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="stack">
+      <section class="card collapsible-card">
+        <div class="card-header">
+          <div class="section-title">Add a link</div>
+          <button class="btn icon" id="linkFormToggle" type="button" aria-expanded="false">+</button>
+        </div>
+        <div class="collapsible collapsed" id="linkFormWrap">
+          <form id="linkForm" class="form">
+          <label class="field">
+            <span>Label</span>
+            <input id="linkLabel" type="text" placeholder="Link label" required />
+          </label>
+          <label class="field">
+            <span>URL</span>
+            <input id="linkUrl" type="text" placeholder="https://example.com" required />
+          </label>
+          <button class="btn primary" type="submit">Save link</button>
+          <div class="form-actions">
+            <button class="btn hidden" id="linkDelete" type="button">Delete link</button>
+            <button class="btn" id="linkCancel" type="button">Cancel edit</button>
+          </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Your links</div>
+        <div id="linksList" class="links-list"></div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="links.js"></script>
+  </body>
+</html>

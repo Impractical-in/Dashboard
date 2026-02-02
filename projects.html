@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Projects + Learning</title>
+    <link rel="stylesheet" href="projects.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">Projects + Learning</div>
+        <div class="subtitle">Plan, track, and keep notes in one view</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="stack">
+      <section class="card collapsible-card">
+        <div class="card-header">
+          <div class="section-title">Add a new entry</div>
+          <button class="btn icon" id="entryFormToggle" type="button" aria-expanded="false">+</button>
+        </div>
+        <div class="collapsible collapsed" id="entryFormWrap">
+          <form id="entryForm" class="form">
+          <label class="field">
+            <span>Type</span>
+            <select id="entryType">
+              <option value="Project">Project</option>
+              <option value="Learning">Learning</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Title</span>
+            <input id="entryTitle" type="text" placeholder="Name of the project or topic" required />
+          </label>
+          <label class="field">
+            <span>Start date</span>
+            <input id="entryStart" type="date" required />
+          </label>
+          <label class="field">
+            <span>End date</span>
+            <input id="entryEnd" type="date" />
+          </label>
+          <label class="field">
+            <span>Links (comma separated)</span>
+            <input id="entryLinks" type="text" placeholder="https://..., https://..." />
+          </label>
+          <label class="field">
+            <span>Notes</span>
+            <textarea id="entryNotes" rows="4" placeholder="What is this about?"></textarea>
+          </label>
+          <div class="suggestions" id="entrySuggestions"></div>
+          <label class="field">
+            <span>Tags (comma separated)</span>
+            <input id="entryTags" type="text" placeholder="research, roadmap, practice" />
+          </label>
+          <div class="field">
+            <span>Linked items</span>
+            <div id="entryLinkedItems" class="linked-items"></div>
+          </div>
+          <button class="btn primary" type="submit">Add entry</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Your entries</div>
+        <div class="entries" id="entriesList"></div>
+
+        <div class="section-title">Gantt timeline</div>
+        <div class="gantt-legend">
+          <span class="legend-item"><span class="legend-swatch project"></span>Project</span>
+          <span class="legend-item"><span class="legend-swatch learning"></span>Learning</span>
+          <span class="legend-item"><span class="legend-swatch work"></span>Worked time</span>
+        </div>
+        <div class="gantt-controls">
+          <button class="btn" id="zoomOutBtn" type="button">-</button>
+          <input id="zoomRange" type="range" min="2" max="48" value="8" />
+          <button class="btn" id="zoomInBtn" type="button">+</button>
+          <button class="btn ghost" id="zoomResetBtn" type="button">Reset</button>
+        </div>
+        <div class="gantt-wrap" id="ganttWrap">
+          <canvas id="ganttCanvas" height="360"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="projects.js"></script>
+  </body>
+</html>

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>To-Do List</title>
+    <link rel="stylesheet" href="todo.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <div class="title">To-Do List</div>
+        <div class="subtitle">Priorities, due dates, and fast planning</div>
+      </div>
+      <a class="btn ghost" href="index.html">Back to Home</a>
+    </header>
+
+    <main class="stack">
+      <section class="card collapsible-card" id="taskFormCard">
+        <div class="card-header">
+          <div class="section-title">Add a task</div>
+          <button class="btn icon" id="taskFormToggle" type="button" aria-expanded="false">+</button>
+        </div>
+        <div class="collapsible collapsed" id="taskFormWrap">
+          <form id="taskForm" class="form">
+          <label class="field">
+            <span>Task</span>
+            <input id="taskTitle" type="text" placeholder="What needs to be done?" required />
+          </label>
+          <label class="field">
+            <span>Priority</span>
+            <select id="taskPriority">
+              <option value="P1">P1 - Critical</option>
+              <option value="P2" selected>P2 - High</option>
+              <option value="P3">P3 - Medium</option>
+              <option value="P4">P4 - Low</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Due date & time</span>
+            <input id="taskDue" type="datetime-local" />
+          </label>
+          <div class="quick-row">
+            <button class="btn" type="button" data-quick="today">Today</button>
+            <button class="btn" type="button" data-quick="tomorrow">Tomorrow</button>
+            <button class="btn" type="button" data-quick="nextweek">Next week</button>
+          </div>
+          <label class="field">
+            <span>Notes</span>
+            <textarea id="taskNotes" rows="3" placeholder="Optional details..."></textarea>
+          </label>
+          <div class="suggestions" id="taskSuggestions"></div>
+          <label class="field">
+            <span>Tags (comma separated)</span>
+            <input id="taskTags" type="text" placeholder="errands, deep work, calls" />
+          </label>
+          <div class="field">
+            <span>Linked items</span>
+            <div id="taskLinkedItems" class="linked-items"></div>
+          </div>
+          <button class="btn primary" type="submit">Save task</button>
+          <div class="form-actions">
+            <button class="btn hidden" id="taskDelete" type="button">Delete task</button>
+            <button class="btn" id="taskCancel" type="button">Cancel edit</button>
+          </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Your tasks</div>
+        <div class="section-title">Scheduled for</div>
+        <div class="schedule-row">
+          <button class="btn" id="prevScheduleDay" type="button">◀</button>
+          <input id="scheduleDate" type="date" />
+          <button class="btn" id="nextScheduleDay" type="button">▶</button>
+        </div>
+        <div class="week-row" id="scheduleWeek"></div>
+        <div class="schedule-list" id="scheduledList"></div>
+        <div class="filters">
+          <select id="statusFilter">
+            <option value="all">All</option>
+            <option value="open">Open</option>
+            <option value="done">Done</option>
+          </select>
+          <select id="priorityFilter">
+            <option value="all">All priorities</option>
+            <option value="P1">P1</option>
+            <option value="P2">P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+          </select>
+          <input id="searchInput" type="search" placeholder="Search tasks..." />
+        </div>
+        <div id="taskList" class="task-list"></div>
+        <div class="section-title">Archived tasks</div>
+        <div id="archiveList" class="task-list"></div>
+      </section>
+    </main>
+
+    <script src="storage.js"></script>
+    <script src="todo.js"></script>
+  </body>
+</html>
