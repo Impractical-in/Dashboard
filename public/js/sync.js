@@ -418,7 +418,11 @@ function scheduleLocalAutoBackup(hours) {
 }
 
 function getServerConfig() {
-  const url = (serverUrlInput && serverUrlInput.value.trim()) || localStorage.getItem(SERVER_URL_KEY) || "";
+  const url =
+    (serverUrlInput && serverUrlInput.value.trim()) ||
+    localStorage.getItem(SERVER_URL_KEY) ||
+    (typeof window !== "undefined" ? window.location.origin : "") ||
+    "";
   const token = (serverTokenInput && serverTokenInput.value.trim()) || localStorage.getItem(SERVER_TOKEN_KEY) || "";
   return { url, token };
 }
@@ -526,11 +530,11 @@ if (localInterval) {
   });
 }
 
-if (serverUrlInput) {
-  serverUrlInput.addEventListener("change", () => {
-    persistServerConfig();
-  });
-}
+  if (serverUrlInput) {
+    serverUrlInput.addEventListener("change", () => {
+      persistServerConfig();
+    });
+  }
 
 if (serverTokenInput) {
   serverTokenInput.addEventListener("change", () => {
@@ -613,6 +617,10 @@ initStorage().then(() => {
     const storedToken = localStorage.getItem(SERVER_TOKEN_KEY);
     const storedEnabled = localStorage.getItem(SERVER_SYNC_ENABLED_KEY) === "true";
     if (storedUrl) serverUrlInput.value = storedUrl;
+    if (!storedUrl && typeof window !== "undefined") {
+      serverUrlInput.value = window.location.origin;
+      persistServerConfig();
+    }
     if (storedToken) serverTokenInput.value = storedToken;
     serverSyncToggle.checked = storedEnabled;
     updateServerStatus(storedEnabled ? "Enabled" : "Disabled");

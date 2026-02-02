@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## v0.1.3
+- Serve UI + sync API from a single Node server/port
+- Local server sync UI + auto URL defaulting
+- Public assets moved under public/ for clean hosting
+- Fix dark styling for inputs/suggestions
+- Export backups use timestamped filenames
+
 ## v0.1.2
 - Move done tasks out of the main list and into archive on save/refresh
 - Add edit history logging for Projects/Learning entries

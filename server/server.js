@@ -8,6 +8,7 @@ const TOKEN = process.env.DASHBOARD_TOKEN || "";
 const DATA_DIR = path.join(__dirname, "..", "user_data");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
 const DATA_FILE = path.join(DATA_DIR, "dashboard.json");
+const PUBLIC_DIR = path.join(__dirname, "..", "public");
 
 function ensureDirs() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -20,6 +21,7 @@ function send(res, status, payload) {
 }
 
 function handleCors(req, res) {
+  if (!req.url.startsWith("/api/")) return false;
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
@@ -29,6 +31,37 @@ function handleCors(req, res) {
     return true;
   }
   return false;
+}
+
+function getContentType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === ".html") return "text/html; charset=utf-8";
+  if (ext === ".css") return "text/css; charset=utf-8";
+  if (ext === ".js") return "application/javascript; charset=utf-8";
+  if (ext === ".json") return "application/json; charset=utf-8";
+  if (ext === ".mp3") return "audio/mpeg";
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".svg") return "image/svg+xml";
+  return "application/octet-stream";
+}
+
+function serveStatic(req, res) {
+  const safePath = decodeURIComponent(req.url.split("?")[0]);
+  const relPath = safePath === "/" ? "/index.html" : safePath;
+  const filePath = path.join(PUBLIC_DIR, relPath);
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return true;
+  }
+  if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+    return false;
+  }
+  const contentType = getContentType(filePath);
+  res.writeHead(200, { "Content-Type": contentType });
+  fs.createReadStream(filePath).pipe(res);
+  return true;
 }
 
 function isAuthorized(req) {
@@ -93,6 +126,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 200, { ok: true });
   }
 
+  if (serveStatic(req, res)) return;
   send(res, 404, { error: "not_found" });
 });
 

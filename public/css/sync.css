@@ -37,6 +37,13 @@ option {
   color: var(--text);
 }
 
+input,
+textarea {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
 .topbar {
   padding: 22px 28px;
   border-bottom: 1px solid var(--border);
