@@ -15,6 +15,12 @@ const localAutoToggle = document.getElementById("localAutoBackup");
 const localInterval = document.getElementById("localBackupInterval");
 const lastSavedLabel = document.getElementById("lastSavedLabel");
 const lastBackupLabel = document.getElementById("lastBackupLabel");
+const serverStatus = document.getElementById("serverStatus");
+const serverUrlInput = document.getElementById("serverUrl");
+const serverTokenInput = document.getElementById("serverToken");
+const serverSyncToggle = document.getElementById("serverSyncToggle");
+const serverPullBtn = document.getElementById("serverPullBtn");
+const serverPushBtn = document.getElementById("serverPushBtn");
 
 const OAUTH_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
@@ -27,11 +33,16 @@ const AUTO_INTERVAL_KEY = "gdriveAutoIntervalHours";
 const LOCAL_AUTO_ENABLED_KEY = "localAutoEnabled";
 const LOCAL_AUTO_INTERVAL_KEY = "localAutoIntervalHours";
 const LOCAL_LAST_SNAPSHOT_KEY = "localLastSnapshot";
+const SERVER_SYNC_ENABLED_KEY = "serverSyncEnabled";
+const SERVER_URL_KEY = "serverSyncUrl";
+const SERVER_TOKEN_KEY = "serverSyncToken";
 
 let tokenClient = null;
 let accessToken = null;
 let pendingAutoBackup = false;
 let localHandle = null;
+let suppressServerSync = false;
+let serverSyncTimer = null;
 
 function updateStatus(message) {
   if (syncStatus) syncStatus.textContent = message;
@@ -39,6 +50,10 @@ function updateStatus(message) {
 
 function updateLocalStatus(message) {
   if (localStatus) localStatus.textContent = message;
+}
+
+function updateServerStatus(message) {
+  if (serverStatus) serverStatus.textContent = message;
 }
 
 function updateLastLabels() {
@@ -170,6 +185,7 @@ async function localSaveNow() {
 
 async function applySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || !snapshot.data) return false;
+  suppressServerSync = true;
   const incomingKeys = new Set(Object.keys(snapshot.data));
   getLocalKeys().forEach((key) => {
     if (!incomingKeys.has(key)) {
@@ -179,6 +195,7 @@ async function applySnapshot(snapshot) {
   Object.entries(snapshot.data).forEach(([key, value]) => {
     saveData(key, value);
   });
+  suppressServerSync = false;
   return true;
 }
 
@@ -400,6 +417,63 @@ function scheduleLocalAutoBackup(hours) {
   }, intervalMs);
 }
 
+function getServerConfig() {
+  const url = (serverUrlInput && serverUrlInput.value.trim()) || localStorage.getItem(SERVER_URL_KEY) || "";
+  const token = (serverTokenInput && serverTokenInput.value.trim()) || localStorage.getItem(SERVER_TOKEN_KEY) || "";
+  return { url, token };
+}
+
+function persistServerConfig() {
+  if (!serverUrlInput || !serverTokenInput) return;
+  localStorage.setItem(SERVER_URL_KEY, serverUrlInput.value.trim());
+  localStorage.setItem(SERVER_TOKEN_KEY, serverTokenInput.value.trim());
+}
+
+async function pullFromServer() {
+  const { url, token } = getServerConfig();
+  if (!url) {
+    updateServerStatus("Missing server URL");
+    return;
+  }
+  const response = await fetch(`${url.replace(/\/$/, "")}/api/data`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    updateServerStatus("Pull failed");
+    return;
+  }
+  const snapshot = await response.json();
+  const applied = await applySnapshot(snapshot);
+  updateServerStatus(applied ? "Pulled from server" : "Pull failed");
+}
+
+async function pushToServer() {
+  const { url, token } = getServerConfig();
+  if (!url) {
+    updateServerStatus("Missing server URL");
+    return;
+  }
+  const snapshot = await buildSnapshot();
+  const response = await fetch(`${url.replace(/\/$/, "")}/api/data`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(snapshot),
+  });
+  updateServerStatus(response.ok ? "Pushed to server" : "Push failed");
+}
+
+function queueServerPush() {
+  if (!serverSyncToggle || !serverSyncToggle.checked) return;
+  if (suppressServerSync) return;
+  if (serverSyncTimer) clearTimeout(serverSyncTimer);
+  serverSyncTimer = setTimeout(() => {
+    pushToServer().catch(() => updateServerStatus("Push failed"));
+  }, 1200);
+}
+
 if (connectBtn) {
   connectBtn.addEventListener("click", () => {
     pendingAutoBackup = true;
@@ -452,6 +526,44 @@ if (localInterval) {
   });
 }
 
+if (serverUrlInput) {
+  serverUrlInput.addEventListener("change", () => {
+    persistServerConfig();
+  });
+}
+
+if (serverTokenInput) {
+  serverTokenInput.addEventListener("change", () => {
+    persistServerConfig();
+  });
+}
+
+if (serverSyncToggle) {
+  serverSyncToggle.addEventListener("change", () => {
+    localStorage.setItem(SERVER_SYNC_ENABLED_KEY, String(serverSyncToggle.checked));
+    updateServerStatus(serverSyncToggle.checked ? "Enabled" : "Disabled");
+    if (serverSyncToggle.checked) {
+      pullFromServer().catch(() => updateServerStatus("Pull failed"));
+    }
+  });
+}
+
+if (serverPullBtn) {
+  serverPullBtn.addEventListener("click", () => {
+    pullFromServer().catch(() => updateServerStatus("Pull failed"));
+  });
+}
+
+if (serverPushBtn) {
+  serverPushBtn.addEventListener("click", () => {
+    pushToServer().catch(() => updateServerStatus("Push failed"));
+  });
+}
+
+if (typeof window !== "undefined") {
+  window.onDataSaved = queueServerPush;
+}
+
 if (autoBackupToggle) {
   autoBackupToggle.addEventListener("change", () => {
     localStorage.setItem(AUTO_ENABLED_KEY, String(autoBackupToggle.checked));
@@ -495,4 +607,17 @@ initStorage().then(() => {
       }
     })
     .catch(() => {});
+
+  if (serverUrlInput && serverTokenInput && serverSyncToggle) {
+    const storedUrl = localStorage.getItem(SERVER_URL_KEY);
+    const storedToken = localStorage.getItem(SERVER_TOKEN_KEY);
+    const storedEnabled = localStorage.getItem(SERVER_SYNC_ENABLED_KEY) === "true";
+    if (storedUrl) serverUrlInput.value = storedUrl;
+    if (storedToken) serverTokenInput.value = storedToken;
+    serverSyncToggle.checked = storedEnabled;
+    updateServerStatus(storedEnabled ? "Enabled" : "Disabled");
+    if (storedEnabled) {
+      pullFromServer().catch(() => updateServerStatus("Pull failed"));
+    }
+  }
 });

@@ -17,6 +17,28 @@
 
     <main class="stack">
       <section class="card">
+        <div class="section-title">Local server sync</div>
+        <div class="status" id="serverStatus">Disabled</div>
+        <div class="field">
+          <span>Server URL</span>
+          <input id="serverUrl" type="text" value="http://localhost:8080" />
+        </div>
+        <div class="field">
+          <span>Shared token (optional)</span>
+          <input id="serverToken" type="text" placeholder="DASHBOARD_TOKEN" />
+        </div>
+        <div class="actions">
+          <label class="toggle">
+            <input id="serverSyncToggle" type="checkbox" />
+            <span>Enable sync</span>
+          </label>
+          <button class="btn" id="serverPullBtn" type="button">Pull from server</button>
+          <button class="btn" id="serverPushBtn" type="button">Push to server</button>
+        </div>
+        <div class="hint">When enabled, saves push to the server and loads on startup.</div>
+      </section>
+
+      <section class="card">
         <div class="section-title">Local auto backup (Chromium)</div>
         <div class="status" id="localStatus">No backup file selected</div>
         <div class="status success" id="localSuccess" hidden>Backup successful</div>

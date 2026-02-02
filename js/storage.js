@@ -28,6 +28,9 @@ function saveData(key, value) {
     idbSet(key, value);
   }
   if (key !== META_KEY) updateMeta();
+  if (typeof window !== "undefined" && typeof window.onDataSaved === "function") {
+    window.onDataSaved();
+  }
 }
 
 function updateMeta() {
