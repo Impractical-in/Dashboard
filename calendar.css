@@ -33,6 +33,12 @@ select {
   color: inherit;
 }
 
+select,
+option {
+  background: var(--card);
+  color: var(--text);
+}
+
 .topbar {
   padding: 22px 28px;
   border-bottom: 1px solid var(--border);

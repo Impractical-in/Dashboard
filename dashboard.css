@@ -33,6 +33,12 @@ select {
   color: inherit;
 }
 
+select,
+option {
+  background: var(--card);
+  color: var(--text);
+}
+
 .topbar {
   padding: 22px 28px;
   border-bottom: 1px solid var(--border);
@@ -312,6 +318,10 @@ select {
 
 .tile.pomodoro .tile-icon {
   background: rgba(189, 106, 126, 0.18);
+}
+
+.tile.sync .tile-icon {
+  background: rgba(110, 183, 255, 0.2);
 }
 
 .form {

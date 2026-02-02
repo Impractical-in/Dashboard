@@ -1,2 +1,7 @@
-sounds/*
-!sounds/.gitkeep
+﻿# Local backup exports
+/dashboard-backup.json
+**/dashboard-backup.json
+
+# User data folder (keep README)
+/user_data/*
+!/user_data/README.md

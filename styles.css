@@ -49,6 +49,12 @@ select {
   color: inherit;
 }
 
+select,
+option {
+  background: var(--card);
+  color: var(--text);
+}
+
 .topbar {
   display: flex;
   align-items: center;

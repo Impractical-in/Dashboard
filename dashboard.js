@@ -425,6 +425,32 @@ function renderCalendarPreview(target) {
   renderPreviewList(target, items, "No upcoming items scheduled.");
 }
 
+function renderSyncPreview(target) {
+  const lastBackup = localStorage.getItem("gdriveLastBackup");
+  const connected = !!localStorage.getItem("gdriveAccessToken");
+  const items = [];
+  if (connected) {
+    items.push(
+      createPreviewItem({
+        title: "Drive connected",
+        pill: "Sync",
+        pillClass: "link",
+        meta: lastBackup ? formatShortDate(lastBackup, true) : "No backups yet",
+      })
+    );
+  } else {
+    items.push(
+      createPreviewItem({
+        title: "Not connected",
+        pill: "Sync",
+        pillClass: "link",
+        meta: "Connect to Drive",
+      })
+    );
+  }
+  renderPreviewList(target, items, "Connect Drive to backup.");
+}
+
 function renderAllPreviews() {
   previewTargets.forEach((target) => {
     const type = target.dataset.preview;
@@ -435,6 +461,7 @@ function renderAllPreviews() {
     if (type === "calendar") return renderCalendarPreview(target);
     if (type === "links") return renderLinksPreview(target);
     if (type === "pomodoro") return renderPomodoroPreview(target);
+    if (type === "sync") return renderSyncPreview(target);
   });
 }
 
@@ -450,4 +477,9 @@ if (previewTargets.length) {
   initPreviews();
   window.addEventListener("focus", renderAllPreviews);
   window.addEventListener("storage", renderAllPreviews);
+}
+
+const footerVersion = document.querySelector(".footer");
+if (footerVersion && typeof window !== "undefined" && window.APP_VERSION) {
+  footerVersion.textContent = `v${window.APP_VERSION}`;
 }

@@ -1,8 +1,15 @@
 const STORAGE_DB = "dashboard_store";
 const STORAGE_STORE = "kv";
+const META_KEY = "appMeta";
+const APP_VERSION = "0.1.1";
 
 let storageReady = false;
 let storageInitPromise = null;
+let metaUpdateInProgress = false;
+
+if (typeof window !== "undefined") {
+  window.APP_VERSION = APP_VERSION;
+}
 
 function loadData(key, fallback) {
   const raw = localStorage.getItem(key);
@@ -20,6 +27,21 @@ function saveData(key, value) {
   if (storageReady) {
     idbSet(key, value);
   }
+  if (key !== META_KEY) updateMeta();
+}
+
+function updateMeta() {
+  if (metaUpdateInProgress) return;
+  metaUpdateInProgress = true;
+  const meta = {
+    version: APP_VERSION,
+    lastSavedAt: new Date().toISOString(),
+  };
+  localStorage.setItem(META_KEY, JSON.stringify(meta));
+  if (storageReady) {
+    idbSet(META_KEY, meta);
+  }
+  metaUpdateInProgress = false;
 }
 
 function getStoredValue(key) {
@@ -59,6 +81,13 @@ function resetIfRequested() {
   const params = new URLSearchParams(window.location.search);
   if (!params.has("reset")) return;
   RESET_KEYS.forEach((key) => localStorage.removeItem(key));
+  if (typeof indexedDB !== "undefined") {
+    try {
+      indexedDB.deleteDatabase(STORAGE_DB);
+    } catch (err) {
+      // Ignore reset failures to avoid blocking init.
+    }
+  }
 }
 
 function initStorage() {
