@@ -1,16 +1,16 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Backup & Sync</title>
-    <link rel="stylesheet" href="../css/sync.css" />
+    <link rel="stylesheet" href="css/sync.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
         <div class="title">Backup & Sync</div>
-        <div class="subtitle">Google Drive appDataFolder backups</div>
+        <div class="subtitle">Local-only backups stored on your PC</div>
       </div>
       <a class="btn ghost" href="index.html">Back to Home</a>
     </header>
@@ -29,6 +29,7 @@
             Save snapshot now
             <span class="btn-sub" id="lastBackupLabel">Never</span>
           </button>
+          <button class="btn" id="localRestoreBtn" type="button">Restore snapshot file</button>
         </div>
         <div class="field">
           <span>Auto snapshot</span>
@@ -47,7 +48,7 @@
             </select>
           </div>
         </div>
-        <div class="hint">Requires Chromium-based browsers. After choosing a file once, we can overwrite it on schedule.</div>
+        <div class="hint">Choose a JSON file once and the app can keep updating that file on your disk.</div>
       </section>
 
       <section class="card">
@@ -62,8 +63,10 @@
       </section>
     </main>
 
-    <script src="../js/storage.js"></script>
-    <script src="../js/sync.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/sync.js"></script>
+      <script src="js/agent-chat.js"></script>
   </body>
 </html>
+
 

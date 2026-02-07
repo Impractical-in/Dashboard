@@ -5,3 +5,15 @@
 # User data folder (keep README)
 /user_data/*
 !/user_data/README.md
+/working_server_version/
+
+
+# Server source-of-truth data files (never commit)
+/user_data/server_state*.json
+/working_server_version/user_data/server_state*.json
+
+# Runtime pid files
+script_test/.dashboard-server.pid
+script_test/.dashboard-ollama.pid
+working_server_version/script_test/.dashboard-server.pid
+working_server_version/script_test/.dashboard-ollama.pid

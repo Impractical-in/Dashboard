@@ -426,29 +426,16 @@ function renderCalendarPreview(target) {
 }
 
 function renderSyncPreview(target) {
-  const lastBackup = localStorage.getItem("gdriveLastBackup");
-  const connected = !!localStorage.getItem("gdriveAccessToken");
-  const items = [];
-  if (connected) {
-    items.push(
-      createPreviewItem({
-        title: "Drive connected",
-        pill: "Sync",
-        pillClass: "link",
-        meta: lastBackup ? formatShortDate(lastBackup, true) : "No backups yet",
-      })
-    );
-  } else {
-    items.push(
-      createPreviewItem({
-        title: "Not connected",
-        pill: "Sync",
-        pillClass: "link",
-        meta: "Connect to Drive",
-      })
-    );
-  }
-  renderPreviewList(target, items, "Connect Drive to backup.");
+  const lastBackup = localStorage.getItem("localLastSnapshot");
+  const items = [
+    createPreviewItem({
+      title: "Local backup",
+      pill: "Sync",
+      pillClass: "link",
+      meta: lastBackup ? formatShortDate(lastBackup, true) : "No snapshot yet",
+    }),
+  ];
+  renderPreviewList(target, items, "Open Backup & Sync to save a local snapshot file.");
 }
 
 function renderAllPreviews() {
@@ -483,3 +470,4 @@ const footerVersion = document.getElementById("appVersion");
 if (footerVersion && typeof window !== "undefined" && window.APP_VERSION) {
   footerVersion.textContent = `v${window.APP_VERSION}`;
 }
+
