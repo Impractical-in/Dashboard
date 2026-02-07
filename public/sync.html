@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -10,34 +10,12 @@
     <header class="topbar">
       <div>
         <div class="title">Backup & Sync</div>
-        <div class="subtitle">Google Drive appDataFolder backups</div>
+        <div class="subtitle">Local-only backups stored on your PC</div>
       </div>
       <a class="btn ghost" href="index.html">Back to Home</a>
     </header>
 
     <main class="stack">
-      <section class="card">
-        <div class="section-title">Local server sync</div>
-        <div class="status" id="serverStatus">Disabled</div>
-        <div class="field">
-          <span>Server URL</span>
-          <input id="serverUrl" type="text" placeholder="http://localhost:8080" />
-        </div>
-        <div class="field">
-          <span>Shared token (optional)</span>
-          <input id="serverToken" type="text" placeholder="DASHBOARD_TOKEN" />
-        </div>
-        <div class="actions">
-          <label class="toggle">
-            <input id="serverSyncToggle" type="checkbox" />
-            <span>Enable sync</span>
-          </label>
-          <button class="btn" id="serverPullBtn" type="button">Pull from server</button>
-          <button class="btn" id="serverPushBtn" type="button">Push to server</button>
-        </div>
-        <div class="hint">When enabled, saves push to the server and loads on startup.</div>
-      </section>
-
       <section class="card">
         <div class="section-title">Local auto backup (Chromium)</div>
         <div class="status" id="localStatus">No backup file selected</div>
@@ -51,6 +29,7 @@
             Save snapshot now
             <span class="btn-sub" id="lastBackupLabel">Never</span>
           </button>
+          <button class="btn" id="localRestoreBtn" type="button">Restore snapshot file</button>
         </div>
         <div class="field">
           <span>Auto snapshot</span>
@@ -69,7 +48,7 @@
             </select>
           </div>
         </div>
-        <div class="hint">Requires Chromium-based browsers. After choosing a file once, we can overwrite it on schedule.</div>
+        <div class="hint">Choose a JSON file once and the app can keep updating that file on your disk.</div>
       </section>
 
       <section class="card">
@@ -86,6 +65,7 @@
 
     <script src="js/storage.js"></script>
     <script src="js/sync.js"></script>
+      <script src="js/agent-chat.js"></script>
   </body>
 </html>
 

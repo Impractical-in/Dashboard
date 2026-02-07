@@ -2,10 +2,14 @@ const STORAGE_DB = "dashboard_store";
 const STORAGE_STORE = "kv";
 const META_KEY = "appMeta";
 const APP_VERSION = "0.1.3";
+const SERVER_STATE_ENDPOINT = "/api/state";
 
 let storageReady = false;
 let storageInitPromise = null;
 let metaUpdateInProgress = false;
+let serverPushTimer = null;
+let serverPushInFlight = false;
+let suppressServerPush = false;
 
 if (typeof window !== "undefined") {
   window.APP_VERSION = APP_VERSION;
@@ -28,6 +32,7 @@ function saveData(key, value) {
     idbSet(key, value);
   }
   if (key !== META_KEY) updateMeta();
+  if (storageReady && !suppressServerPush) queueServerPush();
   if (typeof window !== "undefined" && typeof window.onDataSaved === "function") {
     window.onDataSaved();
   }
@@ -44,6 +49,7 @@ function updateMeta() {
   if (storageReady) {
     idbSet(META_KEY, meta);
   }
+  if (storageReady && !suppressServerPush) queueServerPush();
   metaUpdateInProgress = false;
 }
 
@@ -95,31 +101,31 @@ function resetIfRequested() {
 
 function initStorage() {
   if (storageInitPromise) return storageInitPromise;
-  storageInitPromise = new Promise((resolve) => {
-    if (typeof indexedDB === "undefined") {
-      resetIfRequested();
-      storageReady = true;
-      resolve();
-      return;
+  storageInitPromise = (async () => {
+    resetIfRequested();
+    const localBeforeServer = buildStateSnapshot();
+    if (typeof indexedDB !== "undefined") {
+      try {
+        const db = await openDb();
+        await syncLocalStorage(db);
+      } catch (err) {
+        // Continue without blocking init.
+      }
     }
-    openDb()
-      .then((db) => {
-        syncLocalStorage(db)
-          .then(() => {
-            resetIfRequested();
-            storageReady = true;
-            resolve();
-          })
-          .catch(() => {
-            storageReady = true;
-            resolve();
-          });
-      })
-      .catch(() => {
-        storageReady = true;
-        resolve();
-      });
-  });
+    try {
+      const serverData = await fetchStateFromServer();
+      const serverHasData = Object.keys(serverData).length > 0;
+      const localHasData = Object.keys(localBeforeServer).length > 0;
+      if (serverHasData) {
+        applyServerState(serverData);
+      } else if (localHasData) {
+        await postStateToServer(localBeforeServer);
+      }
+    } catch (err) {
+      // If server is unavailable, keep current local cache.
+    }
+    storageReady = true;
+  })();
   return storageInitPromise;
 }
 
@@ -195,4 +201,68 @@ function syncLocalStorage(db) {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+function parseLocalValue(key) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
+}
+
+function buildStateSnapshot() {
+  const data = {};
+  getLocalKeys().forEach((key) => {
+    data[key] = parseLocalValue(key);
+  });
+  return data;
+}
+
+function applyServerState(data) {
+  suppressServerPush = true;
+  getLocalKeys().forEach((key) => localStorage.removeItem(key));
+  Object.entries(data || {}).forEach(([key, value]) => {
+    localStorage.setItem(key, JSON.stringify(value));
+    if (storageReady) idbSet(key, value);
+  });
+  suppressServerPush = false;
+}
+
+async function fetchStateFromServer() {
+  const response = await fetch(SERVER_STATE_ENDPOINT);
+  if (!response.ok) throw new Error("state_pull_failed");
+  const payload = await response.json();
+  return payload && payload.data && typeof payload.data === "object" ? payload.data : {};
+}
+
+async function postStateToServer(data) {
+  const response = await fetch(SERVER_STATE_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ version: 1, data }),
+  });
+  if (!response.ok) throw new Error("state_push_failed");
+}
+
+async function pushStateToServer() {
+  if (serverPushInFlight || !storageReady || suppressServerPush) return;
+  serverPushInFlight = true;
+  try {
+    const data = buildStateSnapshot();
+    await postStateToServer(data);
+  } catch (err) {
+    // Non-fatal: next save will retry.
+  } finally {
+    serverPushInFlight = false;
+  }
+}
+
+function queueServerPush() {
+  if (serverPushTimer) clearTimeout(serverPushTimer);
+  serverPushTimer = setTimeout(() => {
+    pushStateToServer().catch(() => {});
+  }, 350);
 }
