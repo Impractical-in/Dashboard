@@ -11,6 +11,10 @@
 # Server source-of-truth data files (never commit)
 /user_data/server_state*.json
 /working_server_version/user_data/server_state*.json
+/user_data/state_backups/
+/user_data/backup_backup/
+/working_server_version/user_data/state_backups/
+/working_server_version/user_data/backup_backup/
 
 # Runtime pid files
 script_test/.dashboard-server.pid

@@ -44,3 +44,18 @@ If you want the app launched like a local machine script (browser UI + script-ma
 - Stop: `./script_test/stop.ps1`
 
 Use port `8080` to keep the same existing browser data origin (`localhost:8080`).
+
+## Fresh Machine (Git Clone) Setup
+If you clone this repo on another machine and want the same runtime behavior:
+
+1. Install Node.js.
+2. Install Ollama.
+3. Run:
+   - `ollama pull llama3.2:3b`
+4. Start stack:
+   - `./script_test/start.ps1 -OpenBrowser -ForceRestart`
+
+The launcher will:
+- start/verify Ollama,
+- start dashboard server,
+- print local + LAN URLs.

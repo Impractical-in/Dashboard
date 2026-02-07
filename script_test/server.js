@@ -6,7 +6,12 @@ const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const DATA_DIR = path.join(__dirname, "..", "user_data");
 const STATE_FILE = path.join(DATA_DIR, "server_state.json");
+const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
+const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
+const MAX_STATE_BACKUPS = 10;
+const GREAT_DELTA_SIZE_RATIO = 0.2;
+const GREAT_DELTA_KEY_RATIO = 0.3;
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -29,6 +34,8 @@ function send(res, status, payload) {
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(STATE_BACKUP_DIR)) fs.mkdirSync(STATE_BACKUP_DIR, { recursive: true });
+  if (!fs.existsSync(STATE_BACKUP_BACKUP_DIR)) fs.mkdirSync(STATE_BACKUP_BACKUP_DIR, { recursive: true });
 }
 
 function loadServerState() {
@@ -40,19 +47,117 @@ function loadServerState() {
     if (parsed && typeof parsed === "object" && parsed.data && typeof parsed.data === "object") {
       return parsed.data;
     }
+    // Backward compatibility: older files may store raw data directly.
+    if (parsed && typeof parsed === "object") return parsed;
     return {};
   } catch (err) {
     return {};
   }
 }
 
-function saveServerState(data) {
+function loadRawStateFile() {
   ensureDataDir();
-  const payload = {
+  if (!fs.existsSync(STATE_FILE)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
+  } catch (err) {
+    return null;
+  }
+}
+
+function extractStateData(payload) {
+  if (!payload || typeof payload !== "object") return {};
+  if (payload.data && typeof payload.data === "object") return payload.data;
+  // Backward compatibility: support direct object payload as state.
+  return payload;
+}
+
+function buildStateEnvelope(data) {
+  return {
     version: 1,
     updatedAt: new Date().toISOString(),
     data,
   };
+}
+
+function isGreatDelta(previousData, nextData) {
+  const prev = previousData && typeof previousData === "object" ? previousData : {};
+  const next = nextData && typeof nextData === "object" ? nextData : {};
+
+  const prevSerialized = JSON.stringify(prev);
+  const nextSerialized = JSON.stringify(next);
+  if (prevSerialized === nextSerialized) return false;
+  if (Object.keys(prev).length === 0) return false;
+
+  const prevLen = Math.max(1, prevSerialized.length);
+  const sizeRatio = Math.abs(nextSerialized.length - prevSerialized.length) / prevLen;
+
+  const prevKeys = new Set(Object.keys(prev));
+  const nextKeys = new Set(Object.keys(next));
+  let changedKeys = 0;
+  prevKeys.forEach((key) => {
+    if (!nextKeys.has(key)) changedKeys += 1;
+  });
+  nextKeys.forEach((key) => {
+    if (!prevKeys.has(key)) changedKeys += 1;
+  });
+  const keyRatio = changedKeys / Math.max(1, prevKeys.size);
+
+  return sizeRatio >= GREAT_DELTA_SIZE_RATIO || keyRatio >= GREAT_DELTA_KEY_RATIO;
+}
+
+function pruneOldBackups() {
+  ensureDataDir();
+  const prune = (dirPath) => {
+    const files = fs
+      .readdirSync(dirPath)
+      .filter((name) => /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}\.json$/.test(name))
+      .sort();
+    const toDelete = files.slice(0, Math.max(0, files.length - MAX_STATE_BACKUPS));
+    toDelete.forEach((name) => {
+      try {
+        fs.unlinkSync(path.join(dirPath, name));
+      } catch (err) {
+        // Ignore pruning failure to avoid blocking state writes.
+      }
+    });
+  };
+
+  prune(STATE_BACKUP_DIR);
+  prune(STATE_BACKUP_BACKUP_DIR);
+}
+
+function backupCurrentStateIfNeeded(previousEnvelope, nextData) {
+  const previousData = extractStateData(previousEnvelope);
+  if (!isGreatDelta(previousData, nextData)) return;
+
+  const now = new Date();
+  const stamp =
+    now
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "_")
+      .replace("Z", "") + `_${String(now.getMilliseconds()).padStart(3, "0")}`;
+  const backupName = `server_state_${stamp}.json`;
+  const backupPath = path.join(STATE_BACKUP_DIR, backupName);
+  const backupBackupPath = path.join(STATE_BACKUP_BACKUP_DIR, backupName);
+  const backupPayload =
+    previousEnvelope && typeof previousEnvelope === "object" ? previousEnvelope : buildStateEnvelope(previousData);
+  const backupBody = JSON.stringify(backupPayload, null, 2);
+  try {
+    fs.writeFileSync(backupPath, backupBody, "utf8");
+    fs.writeFileSync(backupBackupPath, backupBody, "utf8");
+  } catch (err) {
+    return;
+  }
+  pruneOldBackups();
+}
+
+function saveServerState(data) {
+  ensureDataDir();
+  const previousEnvelope = loadRawStateFile();
+  backupCurrentStateIfNeeded(previousEnvelope, data);
+  const payload = buildStateEnvelope(data);
   fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2), "utf8");
 }
 
@@ -114,7 +219,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
-      const data = payload && payload.data && typeof payload.data === "object" ? payload.data : null;
+      const data = extractStateData(payload);
       if (!data) return send(res, 400, { error: "invalid_state" });
       saveServerState(data);
       return send(res, 200, { ok: true });

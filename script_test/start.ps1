@@ -13,6 +13,16 @@ $pidFile = Join-Path $PSScriptRoot ".dashboard-server.pid"
 $ollamaPidFile = Join-Path $PSScriptRoot ".dashboard-ollama.pid"
 $serverScript = Join-Path $PSScriptRoot "server.js"
 
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+  Write-Host "Node.js is not installed or not on PATH. Install Node.js and retry."
+  exit 1
+}
+
+if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
+  Write-Host "Ollama is not installed or not on PATH. Install Ollama and retry."
+  exit 1
+}
+
 function Get-PortProcessId {
   param([int]$CheckPort)
   $line = netstat -ano | Select-String ":$CheckPort" | Select-String "LISTENING" | Select-Object -First 1

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.4 (Current)
+- Add server-side delta backups when state changes are significant ("great delta")
+- Keep only the latest 10 timestamped state backup files for redundancy
+- Keep state API backward compatible with older payload/file shapes
+- Set app version constant to `0.1.4`
+
 ## v0.1.8
 - Add full-stack script launcher in `script_test/start.ps1` (server + Ollama checks)
 - Print LAN URLs for access from other devices on same network
