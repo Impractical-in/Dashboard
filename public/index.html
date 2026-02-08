@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -18,7 +18,7 @@
     </header>
 
     <main class="grid">
-      <a class="tile link-tile todo" href="todo.html">
+      <a class="tile link-tile todo top-focus" href="todo.html">
         <div class="tile-icon">TD</div>
         <div class="tile-body">
           <div class="tile-title">To-Do List</div>
@@ -27,16 +27,7 @@
         </div>
       </a>
 
-      <a class="tile link-tile pomodoro" href="pomodoro.html">
-        <div class="tile-icon">PM</div>
-        <div class="tile-body">
-          <div class="tile-title">Pomodoro Timer</div>
-          <div class="tile-subtitle">Open the session timer and log</div>
-          <div class="tile-preview" data-preview="pomodoro"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile projects" href="projects.html">
+      <a class="tile link-tile projects top-focus" href="projects.html">
         <div class="tile-icon">PR</div>
         <div class="tile-body">
           <div class="tile-title">Projects + Learning</div>
@@ -81,11 +72,20 @@
         </div>
       </a>
 
+      <a class="tile link-tile pomodoro" href="pomodoro.html">
+        <div class="tile-icon">PM</div>
+        <div class="tile-body">
+          <div class="tile-title">Pomodoro Timer</div>
+          <div class="tile-subtitle">Open the session timer and log</div>
+          <div class="tile-preview" data-preview="pomodoro"></div>
+        </div>
+      </a>
+
       <a class="tile link-tile sync" href="sync.html">
         <div class="tile-icon">BK</div>
         <div class="tile-body">
-          <div class="tile-title">Backup & Sync</div>
-          <div class="tile-subtitle">Local snapshot file + manual export</div>
+          <div class="tile-title">Settings & Backup</div>
+          <div class="tile-subtitle">Server restore + local backup tools</div>
           <div class="tile-preview" data-preview="sync"></div>
         </div>
       </a>
@@ -93,15 +93,11 @@
     <div id="timePanel" class="time-panel hidden" aria-live="polite"></div>
     <footer class="footer">
       <span id="appVersion">v0.1.2</span>
-      <span class="footer-divider">�</span>
+      <span class="footer-divider">·</span>
       <a class="footer-link" href="https://impractical.in" target="_blank" rel="noreferrer">impractical.in</a>
     </footer>
     <script src="js/storage.js"></script>
     <script src="js/dashboard.js"></script>
-      <script src="js/agent-chat.js"></script>
+    <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-

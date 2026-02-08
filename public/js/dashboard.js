@@ -435,7 +435,7 @@ function renderSyncPreview(target) {
       meta: lastBackup ? formatShortDate(lastBackup, true) : "No snapshot yet",
     }),
   ];
-  renderPreviewList(target, items, "Open Backup & Sync to save a local snapshot file.");
+  renderPreviewList(target, items, "Open Settings & Backup to manage restore and snapshots.");
 }
 
 function renderAllPreviews() {

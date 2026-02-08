@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.15 (Current)
+- Improve local agent reliability with clearer Ollama/model diagnostics in health checks
+- Improve agent chat error messages by returning actual Ollama error details
+- Reduce/trim agent context payload to avoid model failures on very large dashboard state
+- Add one-click server backup restore APIs and UI (`/api/state/backups`, `/api/state/backups/restore`)
+- Update dashboard layout so top row is only To-Do + Projects/Learning
+- Rename backup tile and page to **Settings & Backup**
+- Bump app version to `0.1.15`
+
 ## v0.1.4 (Current)
 - Add server-side delta backups when state changes are significant ("great delta")
 - Keep only the latest 10 timestamped state backup files for redundancy

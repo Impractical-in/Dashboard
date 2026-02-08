@@ -64,8 +64,12 @@ option {
 .grid {
   display: grid;
   gap: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   padding: 28px;
+}
+
+.top-focus {
+  grid-column: span 2;
 }
 
 .footer {
@@ -429,6 +433,16 @@ textarea {
   font-size: 12px;
 }
 
+@media (max-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .top-focus {
+    grid-column: auto;
+  }
+}
+
 @media (max-width: 640px) {
   .topbar {
     padding: 18px 20px;
@@ -436,5 +450,10 @@ textarea {
 
   .grid {
     padding: 18px;
+    grid-template-columns: 1fr;
+  }
+
+  .top-focus {
+    grid-column: auto;
   }
 }

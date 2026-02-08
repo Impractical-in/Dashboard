@@ -9,6 +9,10 @@ const localAutoToggle = document.getElementById("localAutoBackup");
 const localInterval = document.getElementById("localBackupInterval");
 const lastSavedLabel = document.getElementById("lastSavedLabel");
 const lastBackupLabel = document.getElementById("lastBackupLabel");
+const serverBackupStatus = document.getElementById("serverBackupStatus");
+const serverBackupSelect = document.getElementById("serverBackupSelect");
+const refreshServerBackupsBtn = document.getElementById("refreshServerBackupsBtn");
+const restoreServerBackupBtn = document.getElementById("restoreServerBackupBtn");
 
 const LOCAL_AUTO_ENABLED_KEY = "localAutoEnabled";
 const LOCAL_AUTO_INTERVAL_KEY = "localAutoIntervalHours";
@@ -227,6 +231,64 @@ function scheduleLocalAutoBackup(hours) {
   }, intervalMs);
 }
 
+function updateServerBackupStatus(message) {
+  if (serverBackupStatus) serverBackupStatus.textContent = message;
+}
+
+function backupOptionLabel(item) {
+  const when = item && item.modifiedAt ? new Date(item.modifiedAt).toLocaleString() : "unknown";
+  return `${item.source} | ${item.name} | ${when}`;
+}
+
+async function loadServerBackups() {
+  if (!serverBackupSelect) return;
+  updateServerBackupStatus("Loading backups...");
+  serverBackupSelect.innerHTML = "";
+  try {
+    const response = await fetch("/api/state/backups");
+    if (!response.ok) throw new Error("fetch_failed");
+    const payload = await response.json();
+    const all = [...(payload.primary || []), ...(payload.secondary || [])];
+    if (!all.length) {
+      updateServerBackupStatus("No server backups available yet.");
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No backups";
+      serverBackupSelect.appendChild(option);
+      return;
+    }
+    all.forEach((item) => {
+      const option = document.createElement("option");
+      option.value = JSON.stringify({ name: item.name, source: item.source });
+      option.textContent = backupOptionLabel(item);
+      serverBackupSelect.appendChild(option);
+    });
+    updateServerBackupStatus(`Loaded ${all.length} backup option(s).`);
+  } catch (err) {
+    updateServerBackupStatus("Failed to load backups.");
+  }
+}
+
+async function restoreSelectedServerBackup() {
+  if (!serverBackupSelect || !serverBackupSelect.value) {
+    updateServerBackupStatus("Select a backup first.");
+    return;
+  }
+  const picked = JSON.parse(serverBackupSelect.value);
+  updateServerBackupStatus("Restoring selected backup...");
+  const response = await fetch("/api/state/backups/restore", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: picked.name, source: picked.source }),
+  });
+  if (!response.ok) {
+    updateServerBackupStatus("Restore failed.");
+    return;
+  }
+  updateServerBackupStatus(`Restored ${picked.name} (${picked.source}). Refreshing state...`);
+  window.location.reload();
+}
+
 function queueLocalSave() {
   if (!localAutoToggle || !localAutoToggle.checked) return;
   if (!localHandle) return;
@@ -281,6 +343,18 @@ if (localInterval) {
   });
 }
 
+if (refreshServerBackupsBtn) {
+  refreshServerBackupsBtn.addEventListener("click", () => {
+    loadServerBackups().catch(() => updateServerBackupStatus("Failed to load backups."));
+  });
+}
+
+if (restoreServerBackupBtn) {
+  restoreServerBackupBtn.addEventListener("click", () => {
+    restoreSelectedServerBackup().catch(() => updateServerBackupStatus("Restore failed."));
+  });
+}
+
 if (typeof window !== "undefined") {
   window.onDataSaved = queueLocalSave;
 }
@@ -304,4 +378,6 @@ initStorage().then(() => {
       }
     })
     .catch(() => {});
+
+  loadServerBackups().catch(() => updateServerBackupStatus("Failed to load backups."));
 });

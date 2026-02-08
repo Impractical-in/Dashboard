@@ -99,6 +99,9 @@
         const data = await response.json();
         if (response.ok && data.ok) {
           agentBaseUrl = base;
+          if (data.modelAvailable === false) {
+            return `Connected, but model missing: ${data.model}. Run: ollama pull ${data.model}`;
+          }
           return `Connected (${data.model || "local model"})`;
         }
       } catch (err) {
@@ -123,7 +126,9 @@
         body: JSON.stringify({ question, context: collectContext() }),
       });
       const result = await response.json();
-      pending.textContent = response.ok ? String(result.reply || "") : String(result.detail || result.error || "Request failed");
+      pending.textContent = response.ok
+        ? String(result.reply || "")
+        : String(result.detail || result.error || "Request failed");
     } catch (err) {
       pending.textContent = "Agent unavailable. Start Ollama and try again.";
     } finally {

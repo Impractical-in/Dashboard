@@ -12,6 +12,9 @@ const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;
 const GREAT_DELTA_KEY_RATIO = 0.3;
+const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}\.json$/;
+const AGENT_CONTEXT_MAX_ITEMS = 40;
+const AGENT_CONTEXT_MAX_STRING = 3000;
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -111,7 +114,7 @@ function pruneOldBackups() {
   const prune = (dirPath) => {
     const files = fs
       .readdirSync(dirPath)
-      .filter((name) => /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}\.json$/.test(name))
+      .filter((name) => BACKUP_FILE_PATTERN.test(name))
       .sort();
     const toDelete = files.slice(0, Math.max(0, files.length - MAX_STATE_BACKUPS));
     toDelete.forEach((name) => {
@@ -131,6 +134,12 @@ function backupCurrentStateIfNeeded(previousEnvelope, nextData) {
   const previousData = extractStateData(previousEnvelope);
   if (!isGreatDelta(previousData, nextData)) return;
 
+  writeBackupEnvelope(previousEnvelope && typeof previousEnvelope === "object"
+    ? previousEnvelope
+    : buildStateEnvelope(previousData));
+}
+
+function writeBackupEnvelope(backupPayload) {
   const now = new Date();
   const stamp =
     now
@@ -141,8 +150,6 @@ function backupCurrentStateIfNeeded(previousEnvelope, nextData) {
   const backupName = `server_state_${stamp}.json`;
   const backupPath = path.join(STATE_BACKUP_DIR, backupName);
   const backupBackupPath = path.join(STATE_BACKUP_BACKUP_DIR, backupName);
-  const backupPayload =
-    previousEnvelope && typeof previousEnvelope === "object" ? previousEnvelope : buildStateEnvelope(previousData);
   const backupBody = JSON.stringify(backupPayload, null, 2);
   try {
     fs.writeFileSync(backupPath, backupBody, "utf8");
@@ -153,12 +160,76 @@ function backupCurrentStateIfNeeded(previousEnvelope, nextData) {
   pruneOldBackups();
 }
 
+function listBackupsFrom(dirPath, source) {
+  ensureDataDir();
+  const names = fs.readdirSync(dirPath).filter((name) => BACKUP_FILE_PATTERN.test(name)).sort().reverse();
+  return names.map((name) => {
+    const fullPath = path.join(dirPath, name);
+    const stat = fs.statSync(fullPath);
+    return {
+      name,
+      source,
+      size: stat.size,
+      modifiedAt: stat.mtime.toISOString(),
+    };
+  });
+}
+
+function listAllBackups() {
+  const primary = listBackupsFrom(STATE_BACKUP_DIR, "primary");
+  const secondary = listBackupsFrom(STATE_BACKUP_BACKUP_DIR, "secondary");
+  return { primary, secondary };
+}
+
+function readBackupEnvelope(name, source) {
+  if (!BACKUP_FILE_PATTERN.test(name)) return null;
+  const baseDir = source === "secondary" ? STATE_BACKUP_BACKUP_DIR : STATE_BACKUP_DIR;
+  const fullPath = path.join(baseDir, name);
+  if (!fullPath.startsWith(baseDir) || !fs.existsSync(fullPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(fullPath, "utf8"));
+  } catch (err) {
+    return null;
+  }
+}
+
+function forceBackupCurrentState() {
+  const currentEnvelope = loadRawStateFile();
+  if (!currentEnvelope || typeof currentEnvelope !== "object") return;
+  writeBackupEnvelope(currentEnvelope);
+}
+
 function saveServerState(data) {
   ensureDataDir();
   const previousEnvelope = loadRawStateFile();
   backupCurrentStateIfNeeded(previousEnvelope, data);
   const payload = buildStateEnvelope(data);
   fs.writeFileSync(STATE_FILE, JSON.stringify(payload, null, 2), "utf8");
+}
+
+function truncateString(value, maxLen = AGENT_CONTEXT_MAX_STRING) {
+  const str = String(value);
+  if (str.length <= maxLen) return str;
+  return `${str.slice(0, maxLen)}...[truncated]`;
+}
+
+function sanitizeForAgent(value, depth = 0) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "string") return truncateString(value);
+  if (typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) {
+    const sliced = value.slice(0, AGENT_CONTEXT_MAX_ITEMS);
+    return sliced.map((item) => sanitizeForAgent(item, depth + 1));
+  }
+  if (typeof value === "object") {
+    if (depth > 6) return "[max-depth]";
+    const out = {};
+    Object.entries(value).slice(0, AGENT_CONTEXT_MAX_ITEMS).forEach(([k, v]) => {
+      out[k] = sanitizeForAgent(v, depth + 1);
+    });
+    return out;
+  }
+  return String(value);
 }
 
 function getContentType(filePath) {
@@ -228,11 +299,41 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname === "/api/state/backups" && req.method === "GET") {
+    const backups = listAllBackups();
+    return send(res, 200, backups);
+  }
+
+  if (pathname === "/api/state/backups/restore" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      const payload = raw ? JSON.parse(raw) : {};
+      const name = typeof payload.name === "string" ? payload.name : "";
+      const source = payload.source === "secondary" ? "secondary" : "primary";
+      const envelope = readBackupEnvelope(name, source);
+      if (!envelope) return send(res, 400, { error: "invalid_backup" });
+      forceBackupCurrentState();
+      const data = extractStateData(envelope);
+      saveServerState(data);
+      return send(res, 200, { ok: true, restored: name, source });
+    } catch (err) {
+      return send(res, 400, { error: "restore_failed" });
+    }
+  }
+
   if (pathname === "/api/agent/health" && req.method === "GET") {
     try {
       const response = await fetch("http://127.0.0.1:11434/api/tags");
       if (!response.ok) return send(res, 502, { ok: false, error: "ollama_unavailable" });
-      return send(res, 200, { ok: true, model: AGENT_MODEL });
+      const payload = await response.json();
+      const modelNames = Array.isArray(payload.models) ? payload.models.map((m) => m.name) : [];
+      const modelAvailable = modelNames.includes(AGENT_MODEL);
+      return send(res, 200, {
+        ok: true,
+        model: AGENT_MODEL,
+        modelAvailable,
+        detail: modelAvailable ? "ready" : `model_missing:${AGENT_MODEL}`,
+      });
     } catch (err) {
       return send(res, 502, { ok: false, error: "ollama_unavailable" });
     }
@@ -243,7 +344,7 @@ const server = http.createServer(async (req, res) => {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
       const question = String(payload.question || "").trim();
-      const context = payload.context && typeof payload.context === "object" ? payload.context : {};
+      const context = payload.context && typeof payload.context === "object" ? sanitizeForAgent(payload.context) : {};
       if (!question) return send(res, 400, { error: "missing_question" });
 
       const controller = new AbortController();
@@ -276,7 +377,11 @@ const server = http.createServer(async (req, res) => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        return send(res, 502, { error: "agent_unavailable", detail: "Ollama returned an error" });
+        const body = await response.text();
+        return send(res, 502, {
+          error: "agent_unavailable",
+          detail: truncateString(body || "Ollama returned an error", 400),
+        });
       }
 
       const result = await response.json();
@@ -284,9 +389,12 @@ const server = http.createServer(async (req, res) => {
       if (!reply) return send(res, 502, { error: "empty_reply" });
       return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama" });
     } catch (err) {
+      if (err && err.name === "AbortError") {
+        return send(res, 504, { error: "agent_timeout", detail: "Agent response timed out." });
+      }
       return send(res, 502, {
         error: "agent_unavailable",
-        detail: "Start Ollama locally (http://127.0.0.1:11434) and pull a model.",
+        detail: err && err.message ? err.message : "Start Ollama locally (http://127.0.0.1:11434) and pull a model.",
       });
     }
   }

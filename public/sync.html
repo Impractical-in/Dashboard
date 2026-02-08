@@ -3,14 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Backup & Sync</title>
+    <title>Settings & Backup</title>
     <link rel="stylesheet" href="css/sync.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Backup & Sync</div>
-        <div class="subtitle">Local-only backups stored on your PC</div>
+        <div class="title">Settings & Backup</div>
+        <div class="subtitle">Settings and backup controls</div>
       </div>
       <a class="btn ghost" href="index.html">Back to Home</a>
     </header>
@@ -49,6 +49,17 @@
           </div>
         </div>
         <div class="hint">Choose a JSON file once and the app can keep updating that file on your disk.</div>
+      </section>
+
+      <section class="card">
+        <div class="section-title">Server backups (one-click restore)</div>
+        <div class="status" id="serverBackupStatus">Loading backup list...</div>
+        <div class="actions">
+          <select id="serverBackupSelect"></select>
+          <button class="btn" id="refreshServerBackupsBtn" type="button">Refresh</button>
+          <button class="btn primary" id="restoreServerBackupBtn" type="button">Restore selected</button>
+        </div>
+        <div class="hint">Keeps up to 10 great-delta snapshots. Restore replaces current server state.</div>
       </section>
 
       <section class="card">
