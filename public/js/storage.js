@@ -15,6 +15,17 @@ if (typeof window !== "undefined") {
   window.APP_VERSION = APP_VERSION;
 }
 
+function generateId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `id_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
+}
+
+if (typeof window !== "undefined") {
+  window.generateId = generateId;
+}
+
 function loadData(key, fallback) {
   const raw = localStorage.getItem(key);
   if (!raw) return fallback;

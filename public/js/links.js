@@ -66,7 +66,7 @@ function addLink(event) {
     }
   } else {
     links.unshift({
-      id: crypto.randomUUID(),
+      id: generateId(),
       label,
       url,
       createdAt: new Date().toISOString(),

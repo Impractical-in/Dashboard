@@ -290,7 +290,7 @@ function addTask(event) {
     }
   } else {
     const task = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       title,
       priority: priorityInput.value,
       due: dueInput.value,

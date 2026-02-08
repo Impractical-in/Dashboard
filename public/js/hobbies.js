@@ -177,7 +177,7 @@ function addHobby(event) {
     }
   } else {
     const hobby = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       name,
       type,
       icon,

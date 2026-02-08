@@ -119,7 +119,7 @@ function loadEntryForDate(dateKey) {
 
 function saveEntryForDate(dateKey) {
   const entry = {
-    id: entriesByDate[dateKey]?.id || crypto.randomUUID(),
+    id: entriesByDate[dateKey]?.id || generateId(),
     title: titleInput.value.trim(),
     body: bodyInput.value.trim(),
     tags: parseTags(tagsInput.value),

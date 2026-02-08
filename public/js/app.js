@@ -204,7 +204,7 @@ function completeSession() {
   const settings = getSettings();
   const endTime = new Date().toISOString();
   const entry = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type: state.mode,
     plannedMinutes: Math.round(state.totalSeconds / 60),
     actualSeconds: state.totalSeconds,

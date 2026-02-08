@@ -755,7 +755,7 @@ function renderEntries() {
 function addEntry(event) {
   event.preventDefault();
   const entry = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type: typeInput.value,
     title: titleInput.value.trim(),
     startDate: startInput.value,
