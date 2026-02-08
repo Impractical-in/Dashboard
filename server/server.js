@@ -12,7 +12,7 @@ const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;
 const GREAT_DELTA_KEY_RATIO = 0.3;
-const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}\.json$/;
+const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}(?:_[a-zA-Z0-9._-]+)?\.json$/;
 const AGENT_CONTEXT_MAX_ITEMS = 40;
 const AGENT_CONTEXT_MAX_STRING = 3000;
 
@@ -193,6 +193,36 @@ function readBackupEnvelope(name, source) {
   }
 }
 
+function normalizeBackupEnvelope(input) {
+  if (!input || typeof input !== "object") return null;
+  const data = extractStateData(input);
+  if (!data || typeof data !== "object") return null;
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    data,
+  };
+}
+
+function writeUploadedBackup(nameHint, envelope) {
+  const now = new Date();
+  const stamp =
+    now
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "_")
+      .replace("Z", "") + `_${String(now.getMilliseconds()).padStart(3, "0")}`;
+  const safeHint = String(nameHint || "uploaded")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .slice(0, 40);
+  const backupName = `server_state_${stamp}_${safeHint}.json`;
+  const body = JSON.stringify(envelope, null, 2);
+  fs.writeFileSync(path.join(STATE_BACKUP_DIR, backupName), body, "utf8");
+  fs.writeFileSync(path.join(STATE_BACKUP_BACKUP_DIR, backupName), body, "utf8");
+  pruneOldBackups();
+  return backupName;
+}
+
 function forceBackupCurrentState() {
   const currentEnvelope = loadRawStateFile();
   if (!currentEnvelope || typeof currentEnvelope !== "object") return;
@@ -318,6 +348,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { ok: true, restored: name, source });
     } catch (err) {
       return send(res, 400, { error: "restore_failed" });
+    }
+  }
+
+  if (pathname === "/api/state/backups/upload" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      const payload = raw ? JSON.parse(raw) : {};
+      const envelope = normalizeBackupEnvelope(payload.backup);
+      if (!envelope) return send(res, 400, { error: "invalid_backup_payload" });
+      const backupName = writeUploadedBackup(payload.name, envelope);
+      return send(res, 200, { ok: true, uploaded: backupName });
+    } catch (err) {
+      return send(res, 400, { error: "upload_failed" });
     }
   }
 

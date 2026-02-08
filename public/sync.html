@@ -60,6 +60,13 @@
           <button class="btn primary" id="restoreServerBackupBtn" type="button">Restore selected</button>
         </div>
         <div class="hint">Keeps up to 10 great-delta snapshots. Restore replaces current server state.</div>
+        <div class="actions">
+          <label class="btn ghost">
+            Upload backup JSON to server
+            <input id="serverBackupUploadInput" type="file" accept="application/json" />
+          </label>
+          <button class="btn" id="uploadServerBackupBtn" type="button">Upload</button>
+        </div>
       </section>
 
       <section class="card">

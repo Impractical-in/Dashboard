@@ -13,6 +13,8 @@ const serverBackupStatus = document.getElementById("serverBackupStatus");
 const serverBackupSelect = document.getElementById("serverBackupSelect");
 const refreshServerBackupsBtn = document.getElementById("refreshServerBackupsBtn");
 const restoreServerBackupBtn = document.getElementById("restoreServerBackupBtn");
+const serverBackupUploadInput = document.getElementById("serverBackupUploadInput");
+const uploadServerBackupBtn = document.getElementById("uploadServerBackupBtn");
 
 const LOCAL_AUTO_ENABLED_KEY = "localAutoEnabled";
 const LOCAL_AUTO_INTERVAL_KEY = "localAutoIntervalHours";
@@ -289,6 +291,35 @@ async function restoreSelectedServerBackup() {
   window.location.reload();
 }
 
+async function uploadServerBackupFile() {
+  const file = serverBackupUploadInput && serverBackupUploadInput.files && serverBackupUploadInput.files[0];
+  if (!file) {
+    updateServerBackupStatus("Choose a backup JSON file first.");
+    return;
+  }
+  updateServerBackupStatus("Uploading backup...");
+  let parsed = null;
+  try {
+    const text = await file.text();
+    parsed = JSON.parse(text);
+  } catch (err) {
+    updateServerBackupStatus("Invalid JSON file.");
+    return;
+  }
+
+  const response = await fetch("/api/state/backups/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: file.name, backup: parsed }),
+  });
+  if (!response.ok) {
+    updateServerBackupStatus("Upload failed.");
+    return;
+  }
+  updateServerBackupStatus("Backup uploaded. Refreshing list...");
+  await loadServerBackups();
+}
+
 function queueLocalSave() {
   if (!localAutoToggle || !localAutoToggle.checked) return;
   if (!localHandle) return;
@@ -352,6 +383,12 @@ if (refreshServerBackupsBtn) {
 if (restoreServerBackupBtn) {
   restoreServerBackupBtn.addEventListener("click", () => {
     restoreSelectedServerBackup().catch(() => updateServerBackupStatus("Restore failed."));
+  });
+}
+
+if (uploadServerBackupBtn) {
+  uploadServerBackupBtn.addEventListener("click", () => {
+    uploadServerBackupFile().catch(() => updateServerBackupStatus("Upload failed."));
   });
 }
 
