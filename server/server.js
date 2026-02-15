@@ -16,6 +16,11 @@ const GREAT_DELTA_KEY_RATIO = 0.3;
 const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}(?:_[a-zA-Z0-9._-]+)?\.json$/;
 const AGENT_CONTEXT_MAX_ITEMS = 40;
 const AGENT_CONTEXT_MAX_STRING = 3000;
+const AGENT_TIMEOUT_MS = Math.max(10000, Number(process.env.DASHBOARD_AGENT_TIMEOUT_MS || 90000));
+const AGENT_PROMPT_CONTEXT_LIMIT = Math.max(
+  5000,
+  Number(process.env.DASHBOARD_AGENT_CONTEXT_PROMPT_LIMIT || 50000)
+);
 
 function getOllamaBases() {
   const bases = [
@@ -415,6 +420,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/api/agent/chat" && req.method === "POST") {
+    let timeoutId;
     try {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
@@ -423,7 +429,7 @@ const server = http.createServer(async (req, res) => {
       if (!question) return send(res, 400, { error: "missing_question" });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      timeoutId = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
 
       const systemPrompt =
         "You are a local assistant for a personal dashboard. Use the provided dashboard context first. " +
@@ -431,7 +437,7 @@ const server = http.createServer(async (req, res) => {
 
       const userPrompt = [
         "Dashboard context JSON:",
-        JSON.stringify(context).slice(0, 180000),
+        JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
         "",
         `Question: ${question}`,
       ].join("\n");
@@ -464,8 +470,12 @@ const server = http.createServer(async (req, res) => {
       if (!reply) return send(res, 502, { error: "empty_reply" });
       return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama", base });
     } catch (err) {
+      if (timeoutId) clearTimeout(timeoutId);
       if (err && err.name === "AbortError") {
-        return send(res, 504, { error: "agent_timeout", detail: "Agent response timed out." });
+        return send(res, 504, {
+          error: "agent_timeout",
+          detail: `Agent response timed out after ${AGENT_TIMEOUT_MS}ms.`,
+        });
       }
       return send(res, 502, {
         error: "agent_unavailable",
