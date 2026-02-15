@@ -5,6 +5,7 @@ const dueInput = document.getElementById("taskDue");
 const taskColorInput = document.getElementById("taskColor");
 const notesInput = document.getElementById("taskNotes");
 const tagsInput = document.getElementById("taskTags");
+const checklistInput = document.getElementById("taskChecklist");
 const suggestions = document.getElementById("taskSuggestions");
 const linkedItems = document.getElementById("taskLinkedItems");
 const taskList = document.getElementById("taskList");
@@ -44,6 +45,7 @@ function loadTasks() {
     tags: Array.isArray(task.tags) ? task.tags : [],
     linkedItems: Array.isArray(task.linkedItems) ? task.linkedItems : [],
     customColor: typeof task.customColor === "string" ? task.customColor : "",
+    checklist: normalizeChecklist(task.checklist),
   }));
 }
 
@@ -77,6 +79,82 @@ function formatDue(dateValue) {
   if (!dateValue) return "No due date";
   const date = parseDate(dateValue);
   return date ? date.toLocaleString() : "No due date";
+}
+
+function normalizeChecklist(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => {
+      if (typeof item === "string") {
+        const text = item.trim();
+        if (!text) return null;
+        return { id: generateId(), text, done: false, completedAt: "" };
+      }
+      if (!item || typeof item !== "object") return null;
+      const text = String(item.text || "").trim();
+      if (!text) return null;
+      return {
+        id: item.id || generateId(),
+        text,
+        done: Boolean(item.done),
+        completedAt: item.completedAt || "",
+      };
+    })
+    .filter(Boolean);
+}
+
+function parseChecklistInput(value, existing = []) {
+  const previous = new Map();
+  normalizeChecklist(existing).forEach((item) => {
+    previous.set(item.text.toLowerCase(), item);
+  });
+  const lines = String(value || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  return lines
+    .filter((line) => {
+      const key = line.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((line) => {
+      const key = line.toLowerCase();
+      const prior = previous.get(key);
+      if (prior) return { ...prior, text: line };
+      return { id: generateId(), text: line, done: false, completedAt: "" };
+    });
+}
+
+function checklistToText(list) {
+  return normalizeChecklist(list)
+    .map((item) => item.text)
+    .join("\n");
+}
+
+function renderChecklist(task) {
+  const items = normalizeChecklist(task.checklist);
+  if (!items.length) return "";
+  const html = items
+    .map(
+      (item) => `
+      <label class="checklist-item ${item.done ? "done" : ""}">
+        <input type="checkbox" data-check-task="${task.id}" data-check-item="${item.id}" ${
+        item.done ? "checked" : ""
+      } />
+        <span class="checklist-content">
+          <span class="checklist-text">${item.text}</span>
+          <span class="checklist-time">${
+            item.done && item.completedAt ? `Done ${new Date(item.completedAt).toLocaleString()}` : ""
+          }</span>
+        </span>
+      </label>
+    `
+    )
+    .join("");
+  return `<div class="checklist">${html}</div>`;
 }
 
 function comparePriority(a, b) {
@@ -199,6 +277,15 @@ function renderArchive() {
   const sorted = sortTasks(archive).slice(0, 30);
   sorted.forEach((task) => {
     const item = document.createElement("div");
+    const archivedChecklist = normalizeChecklist(task.checklist);
+    const checklistHtml = archivedChecklist.length
+      ? `<ul class="archive-checklist">${archivedChecklist
+          .map(
+            (entry) =>
+              `<li class="${entry.done ? "done" : ""}">${entry.text}</li>`
+          )
+          .join("")}</ul>`
+      : "";
     item.className = "task";
     item.innerHTML = `
       <div class="task-header">
@@ -209,6 +296,7 @@ function renderArchive() {
         task.completedAt ? new Date(task.completedAt).toLocaleString() : "Unknown"
       }</div>
       <div class="task-meta">${task.notes ? task.notes : "<em>No notes</em>"}</div>
+      ${checklistHtml}
     `;
     archiveList.appendChild(item);
   });
@@ -253,6 +341,7 @@ function renderTasks() {
           })
           .join("")
       : "<span class=\"task-meta\">No linked items</span>";
+    const checklistHtml = renderChecklist(task);
     item.innerHTML = `
       <div class="task-header">
         <div class="task-title ${task.done ? "done" : ""}">${colorDot}${task.title}</div>
@@ -262,8 +351,9 @@ function renderTasks() {
       <div class="task-meta">${task.notes ? task.notes : "<em>No notes</em>"}</div>
       <div>${tagHtml}</div>
       <div>${linkHtml}</div>
+      ${checklistHtml}
       <div class="task-actions">
-        <label>
+        <label class="done-toggle">
           <input type="checkbox" data-done="${task.id}" ${
       task.done ? "checked" : ""
     } />
@@ -281,6 +371,7 @@ function addTask(event) {
   const title = titleInput.value.trim();
   if (!title) return;
   const tags = parseTags(tagsInput.value);
+  const checklist = parseChecklistInput(checklistInput ? checklistInput.value : "");
   if (editingId) {
     const task = tasks.find((item) => item.id === editingId);
     if (task) {
@@ -289,6 +380,7 @@ function addTask(event) {
       task.due = dueInput.value;
       task.notes = notesInput.value.trim();
       task.tags = tags;
+      task.checklist = parseChecklistInput(checklistInput ? checklistInput.value : "", task.checklist);
       task.linkedItems = [...currentLinks];
       task.customColor = taskColorInput ? String(taskColorInput.value || "") : "";
     }
@@ -300,6 +392,7 @@ function addTask(event) {
       due: dueInput.value,
       notes: notesInput.value.trim(),
       tags,
+      checklist,
       linkedItems: [...currentLinks],
       customColor: taskColorInput ? String(taskColorInput.value || "") : "",
       done: false,
@@ -362,7 +455,7 @@ if (prevScheduleDayBtn && nextScheduleDayBtn && scheduleDateInput) {
   });
 }
 
-taskList.addEventListener("click", (event) => {
+taskList.addEventListener("change", (event) => {
   const target = event.target;
   if (target.matches("input[data-done]")) {
     const task = tasks.find((item) => item.id === target.dataset.done);
@@ -380,7 +473,23 @@ taskList.addEventListener("click", (event) => {
       renderTasks();
       renderArchive();
     }
+    return;
   }
+  if (target.matches("input[data-check-task][data-check-item]")) {
+    const task = tasks.find((item) => item.id === target.dataset.checkTask);
+    if (!task) return;
+    task.checklist = normalizeChecklist(task.checklist);
+    const checklistItem = task.checklist.find((item) => item.id === target.dataset.checkItem);
+    if (!checklistItem) return;
+    checklistItem.done = target.checked;
+    checklistItem.completedAt = target.checked ? new Date().toISOString() : "";
+    saveTasks();
+    renderTasks();
+  }
+});
+
+taskList.addEventListener("click", (event) => {
+  const target = event.target;
   if (target.matches("button[data-edit]")) {
     const task = tasks.find((item) => item.id === target.dataset.edit);
     if (task) {
@@ -389,6 +498,7 @@ taskList.addEventListener("click", (event) => {
       dueInput.value = task.due || "";
       notesInput.value = task.notes || "";
       tagsInput.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
+      if (checklistInput) checklistInput.value = checklistToText(task.checklist);
       currentLinks = Array.isArray(task.linkedItems) ? [...task.linkedItems] : [];
       if (taskColorInput) taskColorInput.value = task.customColor || "#3f88c5";
       renderLinkedItems();
@@ -450,6 +560,7 @@ taskDeleteBtn.addEventListener("click", () => {
   if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
+  if (checklistInput) checklistInput.value = "";
   renderLinkedItems();
   setFormOpen(false);
 });
@@ -461,6 +572,7 @@ taskCancelBtn.addEventListener("click", () => {
   if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
+  if (checklistInput) checklistInput.value = "";
   renderLinkedItems();
   setFormOpen(false);
 });
@@ -620,5 +732,3 @@ window.addEventListener("focus", () => {
   renderTasks();
   renderLinkedItems();
 });
-
-

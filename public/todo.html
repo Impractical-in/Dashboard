@@ -40,6 +40,8 @@
             <span>Custom color (optional)</span>
             <input id="taskColor" type="color" value="#3f88c5" />
           </label>
+          <label class="field">
+            <span>Due date & time</span>
             <input id="taskDue" type="datetime-local" />
           </label>
           <div class="quick-row">
@@ -55,6 +57,10 @@
           <label class="field">
             <span>Tags (comma separated)</span>
             <input id="taskTags" type="text" placeholder="errands, deep work, calls" />
+          </label>
+          <label class="field">
+            <span>Checklist (one per line)</span>
+            <textarea id="taskChecklist" rows="3" placeholder="Step 1&#10;Step 2"></textarea>
           </label>
           <div class="field">
             <span>Linked items</span>
@@ -105,8 +111,6 @@
       <script src="js/agent-chat.js?v=20260215-local-v2"></script>
   </body>
 </html>
-
-
 
 
 

@@ -133,6 +133,14 @@ select {
   padding: 10px 12px;
 }
 
+input[type="checkbox"] {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  appearance: auto;
+}
+
 select,
 option {
   background: var(--card);
@@ -355,6 +363,26 @@ textarea {
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
+}
+
+.done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.done-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #cfcfcf;
+  background: #000;
+  accent-color: #ffffff;
+  -webkit-appearance: checkbox;
+  appearance: checkbox;
 }
 
 .checklist {
