@@ -9,12 +9,39 @@ const STATE_FILE = path.join(DATA_DIR, "server_state.json");
 const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
 const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
+const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;
 const GREAT_DELTA_KEY_RATIO = 0.3;
 const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}(?:_[a-zA-Z0-9._-]+)?\.json$/;
 const AGENT_CONTEXT_MAX_ITEMS = 40;
 const AGENT_CONTEXT_MAX_STRING = 3000;
+
+function getOllamaBases() {
+  const bases = [
+    OLLAMA_BASE,
+    "http://127.0.0.1:11434",
+    "http://localhost:11434",
+  ];
+  return Array.from(new Set(bases.filter(Boolean)));
+}
+
+async function fetchFromOllama(pathname, options = {}) {
+  const bases = getOllamaBases();
+  const errors = [];
+  for (const base of bases) {
+    try {
+      const response = await fetch(`${base}${pathname}`, options);
+      return { response, base, errors };
+    } catch (err) {
+      const message = err && err.message ? err.message : "unknown_error";
+      errors.push(`${base}: ${message}`);
+    }
+  }
+  const finalError = new Error(errors.join(" | ") || "ollama_unreachable");
+  finalError.name = "OllamaUnavailableError";
+  throw finalError;
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -366,7 +393,7 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/api/agent/health" && req.method === "GET") {
     try {
-      const response = await fetch("http://127.0.0.1:11434/api/tags");
+      const { response, base } = await fetchFromOllama("/api/tags");
       if (!response.ok) return send(res, 502, { ok: false, error: "ollama_unavailable" });
       const payload = await response.json();
       const modelNames = Array.isArray(payload.models) ? payload.models.map((m) => m.name) : [];
@@ -375,10 +402,15 @@ const server = http.createServer(async (req, res) => {
         ok: true,
         model: AGENT_MODEL,
         modelAvailable,
+        base,
         detail: modelAvailable ? "ready" : `model_missing:${AGENT_MODEL}`,
       });
     } catch (err) {
-      return send(res, 502, { ok: false, error: "ollama_unavailable" });
+      return send(res, 502, {
+        ok: false,
+        error: "ollama_unavailable",
+        detail: err && err.message ? truncateString(err.message, 400) : "unreachable",
+      });
     }
   }
 
@@ -404,7 +436,7 @@ const server = http.createServer(async (req, res) => {
         `Question: ${question}`,
       ].join("\n");
 
-      const response = await fetch("http://127.0.0.1:11434/api/chat", {
+      const { response, base } = await fetchFromOllama("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -430,14 +462,16 @@ const server = http.createServer(async (req, res) => {
       const result = await response.json();
       const reply = result && result.message && result.message.content ? result.message.content : "";
       if (!reply) return send(res, 502, { error: "empty_reply" });
-      return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama" });
+      return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama", base });
     } catch (err) {
       if (err && err.name === "AbortError") {
         return send(res, 504, { error: "agent_timeout", detail: "Agent response timed out." });
       }
       return send(res, 502, {
         error: "agent_unavailable",
-        detail: err && err.message ? err.message : "Start Ollama locally (http://127.0.0.1:11434) and pull a model.",
+        detail: err && err.message
+          ? truncateString(err.message, 400)
+          : "Ollama reachable check failed",
       });
     }
   }
