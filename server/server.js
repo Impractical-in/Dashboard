@@ -9,6 +9,7 @@ const STATE_FILE = path.join(DATA_DIR, "server_state.json");
 const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
 const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
+const AGENT_VERSION = "v0.1";
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;
@@ -405,6 +406,7 @@ const server = http.createServer(async (req, res) => {
       const modelAvailable = modelNames.includes(AGENT_MODEL);
       return send(res, 200, {
         ok: true,
+        agentVersion: AGENT_VERSION,
         model: AGENT_MODEL,
         modelAvailable,
         base,
@@ -420,7 +422,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (pathname === "/api/agent/chat" && req.method === "POST") {
-    let timeoutId;
     try {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
@@ -428,57 +429,87 @@ const server = http.createServer(async (req, res) => {
       const context = payload.context && typeof payload.context === "object" ? sanitizeForAgent(payload.context) : {};
       if (!question) return send(res, 400, { error: "missing_question" });
 
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
-
       const systemPrompt =
         "You are a local assistant for a personal dashboard. Use the provided dashboard context first. " +
         "Be concise and actionable. If data is missing, say what is missing.";
 
-      const userPrompt = [
-        "Dashboard context JSON:",
+      const contextVariants = [
         JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
-        "",
-        `Question: ${question}`,
-      ].join("\n");
+        JSON.stringify({ generatedAt: new Date().toISOString(), page: context.page || "", data: {} }),
+      ];
 
-      const { response, base } = await fetchFromOllama("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: AGENT_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: false,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      let lastError = null;
+      for (let attempt = 0; attempt < contextVariants.length; attempt += 1) {
+        const attemptTimeout = attempt === 0 ? AGENT_TIMEOUT_MS : Math.max(AGENT_TIMEOUT_MS, 120000);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), attemptTimeout);
+        const userPrompt = [
+          "Dashboard context JSON:",
+          contextVariants[attempt],
+          "",
+          `Question: ${question}`,
+        ].join("\n");
 
-      if (!response.ok) {
-        const body = await response.text();
-        return send(res, 502, {
-          error: "agent_unavailable",
-          detail: truncateString(body || "Ollama returned an error", 400),
-        });
+        try {
+          const { response, base } = await fetchFromOllama("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: AGENT_MODEL,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              stream: false,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const body = await response.text();
+            return send(res, 502, {
+              error: "agent_unavailable",
+              detail: truncateString(body || "Ollama returned an error", 400),
+              agentVersion: AGENT_VERSION,
+            });
+          }
+
+          const result = await response.json();
+          const reply = result && result.message && result.message.content ? result.message.content : "";
+          if (!reply) {
+            lastError = new Error("empty_reply");
+            continue;
+          }
+          return send(res, 200, {
+            reply,
+            model: AGENT_MODEL,
+            source: "ollama",
+            base,
+            agentVersion: AGENT_VERSION,
+            attempt: attempt + 1,
+          });
+        } catch (err) {
+          clearTimeout(timeoutId);
+          lastError = err;
+          if (!(err && err.name === "AbortError")) {
+            break;
+          }
+        }
       }
 
-      const result = await response.json();
-      const reply = result && result.message && result.message.content ? result.message.content : "";
-      if (!reply) return send(res, 502, { error: "empty_reply" });
-      return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama", base });
-    } catch (err) {
-      if (timeoutId) clearTimeout(timeoutId);
-      if (err && err.name === "AbortError") {
+      if (lastError && lastError.name === "AbortError") {
         return send(res, 504, {
           error: "agent_timeout",
-          detail: `Agent response timed out after ${AGENT_TIMEOUT_MS}ms.`,
+          detail: `Agent timed out after retries. Base timeout ${AGENT_TIMEOUT_MS}ms.`,
+          agentVersion: AGENT_VERSION,
         });
       }
+      throw lastError || new Error("agent_failed");
+    } catch (err) {
       return send(res, 502, {
         error: "agent_unavailable",
+        agentVersion: AGENT_VERSION,
         detail: err && err.message
           ? truncateString(err.message, 400)
           : "Ollama reachable check failed",

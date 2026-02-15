@@ -25,7 +25,7 @@
   panel.className = "agent-chat-panel";
   panel.innerHTML = `
     <div class="agent-chat-head">
-      <strong>Local Agent</strong>
+      <strong id="agentTitle">Local Agent v0.1</strong>
       <button type="button" data-close aria-label="Close">x</button>
     </div>
     <div class="agent-chat-log" id="agentChatLog"></div>
@@ -45,10 +45,12 @@
   document.body.appendChild(launcher);
 
   const log = panel.querySelector("#agentChatLog");
+  const titleEl = panel.querySelector("#agentTitle");
   const input = panel.querySelector("#agentChatInput");
   const sendBtn = panel.querySelector("#agentChatSend");
   const closeBtn = panel.querySelector("[data-close]");
   let agentBaseUrl = "";
+  let agentVersion = "v0.1";
 
   function pushMessage(kind, text) {
     const item = document.createElement("div");
@@ -111,10 +113,14 @@
         const data = await response.json();
         if (response.ok && data.ok) {
           agentBaseUrl = base;
+          if (data.agentVersion) {
+            agentVersion = String(data.agentVersion);
+            if (titleEl) titleEl.textContent = `Local Agent ${agentVersion}`;
+          }
           if (data.modelAvailable === false) {
             return `Connected, but model missing: ${data.model}. Run: ollama pull ${data.model}`;
           }
-          return `Connected (${data.model || "local model"}) via ${base}`;
+          return `Connected (${data.model || "local model"}) via ${base} [${agentVersion}]`;
         }
       } catch (err) {
         // Try next candidate base.
@@ -156,7 +162,7 @@
     panel.classList.toggle("open");
     if (panel.classList.contains("open")) {
       if (!log.children.length) {
-        pushMessage("bot", "Local agent ready. I can answer using your dashboard data on this browser.");
+        pushMessage("bot", `Local agent ready (${agentVersion}). I can answer using your dashboard data on this browser.`);
       }
       checkAgentHealth().then((text) => {
         pushMessage("bot", text);
