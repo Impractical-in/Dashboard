@@ -87,8 +87,20 @@
   }
 
   function getCandidateBases() {
-    const bases = [window.location.origin, "http://127.0.0.1:8080", "http://localhost:8080"];
-    return Array.from(new Set(bases.filter(Boolean)));
+    const origin = window.location.origin;
+    const hostname = window.location.hostname;
+    const isHttpOrigin = /^https?:\/\//i.test(origin);
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1";
+
+    if (isHttpOrigin && !isLocalHost) {
+      return [origin];
+    }
+
+    const bases = [origin, "http://127.0.0.1:8080", "http://localhost:8080"];
+    return Array.from(new Set(bases.filter((base) => /^https?:\/\//i.test(base))));
   }
 
   async function checkAgentHealth() {
@@ -102,7 +114,7 @@
           if (data.modelAvailable === false) {
             return `Connected, but model missing: ${data.model}. Run: ollama pull ${data.model}`;
           }
-          return `Connected (${data.model || "local model"})`;
+          return `Connected (${data.model || "local model"}) via ${base}`;
         }
       } catch (err) {
         // Try next candidate base.
@@ -119,6 +131,9 @@
     const pending = pushMessage("bot", "Thinking...");
     sendBtn.disabled = true;
     try {
+      if (!agentBaseUrl) {
+        await checkAgentHealth();
+      }
       const base = agentBaseUrl || window.location.origin;
       const response = await fetch(`${base}/api/agent/chat`, {
         method: "POST",
