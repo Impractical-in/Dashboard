@@ -2,6 +2,9 @@
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
   const STYLE_ID = "dashboard-agent-chat-style";
+  const AGENT_SERVER_IP_KEY = "dashboardAgentServerIp";
+  const AGENT_SERVER_PORT = 8080;
+
   if (!document.getElementById(STYLE_ID)) {
     const style = document.createElement("style");
     style.id = STYLE_ID;
@@ -9,7 +12,9 @@
       .agent-chat-launcher{position:fixed;right:18px;bottom:18px;z-index:9999;width:54px;height:54px;border-radius:999px;border:1px solid #243246;background:#8ec9ff;color:#0b0b0b;font-weight:700;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.35)}
       .agent-chat-panel{position:fixed;right:18px;bottom:84px;z-index:9999;width:min(390px,calc(100vw - 24px));height:min(540px,72vh);display:none;flex-direction:column;border:1px solid #243246;border-radius:14px;background:#0f1722;color:#e8f3ff;box-shadow:0 18px 44px rgba(0,0,0,.4)}
       .agent-chat-panel.open{display:flex}
-      .agent-chat-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #243246;font-size:14px}
+      .agent-chat-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #243246;font-size:14px;gap:8px}
+      .agent-chat-head-actions{display:flex;gap:6px;align-items:center}
+      .agent-chat-head button{border:1px solid #243246;background:#111823;color:#e8f3ff;border-radius:8px;padding:4px 8px;cursor:pointer}
       .agent-chat-log{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
       .agent-chat-msg{padding:8px 10px;border-radius:10px;max-width:90%;white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.35}
       .agent-chat-msg.user{align-self:flex-end;background:#8ec9ff;color:#0b0b0b}
@@ -26,7 +31,10 @@
   panel.innerHTML = `
     <div class="agent-chat-head">
       <strong id="agentTitle">Local Agent v0.1</strong>
-      <button type="button" data-close aria-label="Close">x</button>
+      <div class="agent-chat-head-actions">
+        <button type="button" id="agentServerBtn" title="Set server IP">Server</button>
+        <button type="button" data-close aria-label="Close">x</button>
+      </div>
     </div>
     <div class="agent-chat-log" id="agentChatLog"></div>
     <div class="agent-chat-input">
@@ -49,6 +57,7 @@
   const input = panel.querySelector("#agentChatInput");
   const sendBtn = panel.querySelector("#agentChatSend");
   const closeBtn = panel.querySelector("[data-close]");
+  const serverBtn = panel.querySelector("#agentServerBtn");
   let agentBaseUrl = "";
   let agentVersion = "v0.1";
 
@@ -110,6 +119,96 @@
     return context;
   }
 
+
+  function hasMeaningfulContextData(data) {
+    if (!data || typeof data !== "object") return false;
+    const values = Object.values(data);
+    return values.some((val) => {
+      if (val === null || val === undefined) return false;
+      if (Array.isArray(val)) return val.length > 0;
+      if (typeof val === "object") return Object.keys(val).length > 0;
+      if (typeof val === "string") return val.trim().length > 0;
+      return true;
+    });
+  }
+
+  async function enrichContextFromServer(base, context) {
+    try {
+      const response = await fetch(`${base}/api/state`);
+      if (!response.ok) return context;
+      const payload = await response.json();
+      const serverData = payload && payload.data && typeof payload.data === "object" ? payload.data : {};
+      if (!hasMeaningfulContextData(serverData)) return context;
+
+      const includeKeys = [
+        "todoTasks",
+        "todoArchive",
+        "dashboardEntries",
+        "hobbyTracker",
+        "journalEntries",
+        "quickLinks",
+        "localPomodoroLogs",
+        "appMeta",
+      ];
+
+      const merged = {
+        generatedAt: new Date().toISOString(),
+        page: context.page || window.location.pathname,
+        data: { ...(context.data || {}) },
+      };
+
+      includeKeys.forEach((key) => {
+        const localVal = merged.data[key];
+        const serverVal = compactForAgent(serverData[key]);
+        const localEmpty =
+          localVal === null ||
+          localVal === undefined ||
+          (Array.isArray(localVal) && localVal.length === 0) ||
+          (typeof localVal === "object" && !Array.isArray(localVal) && Object.keys(localVal).length === 0);
+        if (localEmpty && serverVal !== undefined) merged.data[key] = serverVal;
+      });
+
+      return merged;
+    } catch (err) {
+      return context;
+    }
+  }
+  function normalizeServerIp(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const noProto = raw.replace(/^https?:\/\//i, "");
+    const hostPart = noProto.split("/")[0] || "";
+    const hostOnly = hostPart.split(":")[0] || "";
+    return hostOnly.trim();
+  }
+
+  function getSavedServerIp() {
+    return normalizeServerIp(localStorage.getItem(AGENT_SERVER_IP_KEY) || "");
+  }
+
+  function setSavedServerIp(ip) {
+    const normalized = normalizeServerIp(ip);
+    if (!normalized) {
+      localStorage.removeItem(AGENT_SERVER_IP_KEY);
+      return "";
+    }
+    localStorage.setItem(AGENT_SERVER_IP_KEY, normalized);
+    return normalized;
+  }
+
+  function buildBaseFromIp(ip) {
+    return ip ? `http://${ip}:${AGENT_SERVER_PORT}` : "";
+  }
+
+  function promptForServerIp(forcePrompt = false) {
+    const current = getSavedServerIp();
+    const suggested = current || (window.location.hostname && window.location.hostname !== "localhost" ? window.location.hostname : "");
+    if (!forcePrompt && current) return current;
+    const entered = window.prompt(`Enter dashboard server IP (port fixed to ${AGENT_SERVER_PORT})`, suggested);
+    if (entered === null) return current || "";
+    return setSavedServerIp(entered);
+  }
+
   function getCandidateBases() {
     const origin = window.location.origin;
     const hostname = window.location.hostname;
@@ -119,11 +218,14 @@
       hostname === "127.0.0.1" ||
       hostname === "::1";
 
+    const savedIp = getSavedServerIp();
+    const fromIp = savedIp ? buildBaseFromIp(savedIp) : "";
+
     if (isHttpOrigin && !isLocalHost) {
-      return [origin];
+      return Array.from(new Set([fromIp, origin].filter(Boolean)));
     }
 
-    const bases = [origin, "http://127.0.0.1:8080", "http://localhost:8080"];
+    const bases = [fromIp, origin, "http://127.0.0.1:8080", "http://localhost:8080"];
     return Array.from(new Set(bases.filter((base) => /^https?:\/\//i.test(base))));
   }
 
@@ -148,7 +250,7 @@
         // Try next candidate base.
       }
     }
-    return "Agent offline. Open dashboard from localhost:8080 and keep Ollama running.";
+    return `Agent offline. Set correct server IP (fixed port ${AGENT_SERVER_PORT}) and keep Ollama running on that server.`;
   }
 
   async function askAgent() {
@@ -163,17 +265,21 @@
         await checkAgentHealth();
       }
       const base = agentBaseUrl || window.location.origin;
+      let contextPayload = collectContext();
+      if (!hasMeaningfulContextData(contextPayload.data)) {
+        contextPayload = await enrichContextFromServer(base, contextPayload);
+      }
       const response = await fetch(`${base}/api/agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, context: collectContext() }),
+        body: JSON.stringify({ question, context: contextPayload }),
       });
       const result = await response.json();
       pending.textContent = response.ok
         ? String(result.reply || "")
         : String(result.detail || result.error || "Request failed");
     } catch (err) {
-      pending.textContent = "Agent unavailable. Start Ollama and try again.";
+      pending.textContent = "Agent unavailable. Verify server IP and Ollama status.";
     } finally {
       sendBtn.disabled = false;
       input.focus();
@@ -183,8 +289,12 @@
   launcher.addEventListener("click", () => {
     panel.classList.toggle("open");
     if (panel.classList.contains("open")) {
+      const savedIp = promptForServerIp(false);
+      if (!savedIp) {
+        promptForServerIp(true);
+      }
       if (!log.children.length) {
-        pushMessage("bot", `Local agent ready (${agentVersion}). I can answer using your dashboard data on this browser.`);
+        pushMessage("bot", `Local agent ready (${agentVersion}). Entered server IP will use fixed port ${AGENT_SERVER_PORT}.`);
       }
       checkAgentHealth().then((text) => {
         pushMessage("bot", text);
@@ -192,6 +302,13 @@
       input.focus();
     }
   });
+
+  serverBtn.addEventListener("click", () => {
+    const next = promptForServerIp(true);
+    agentBaseUrl = next ? buildBaseFromIp(next) : "";
+    pushMessage("bot", next ? `Server set to ${agentBaseUrl}` : "Server IP cleared. Using auto-detection.");
+  });
+
   closeBtn.addEventListener("click", () => panel.classList.remove("open"));
   sendBtn.addEventListener("click", askAgent);
   input.addEventListener("keydown", (event) => {
@@ -201,3 +318,5 @@
     }
   });
 })();
+
+
