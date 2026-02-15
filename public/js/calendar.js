@@ -283,7 +283,10 @@ function initQuickAdd() {
 }
 
 function formatDayKey(date) {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 function parseDateOnly(value) {
@@ -390,7 +393,7 @@ function seedCalendarDemoDataIfNeeded() {
   const isoDate = (offset) => {
     const d = new Date(today);
     d.setDate(today.getDate() + offset);
-    return d.toISOString().slice(0, 10);
+    return formatDayKey(d);
   };
 
   const demoTasks = [
@@ -527,7 +530,7 @@ function spanTaskAcrossDays(taskId, startDayKey, hour, days) {
   for (let i = 1; i < count; i += 1) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    const clone = cloneTaskAtSlot(base, d.toISOString().slice(0, 10), hour, true);
+    const clone = cloneTaskAtSlot(base, formatDayKey(d), hour, true);
     ensureSeriesFields(clone, seriesId, originId);
     tasks.push(clone);
   }
@@ -971,6 +974,7 @@ function initCalendar() {
 }
 
 initCalendar();
+
 
 
 
