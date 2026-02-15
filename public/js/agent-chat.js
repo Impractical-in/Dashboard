@@ -70,6 +70,28 @@
     }
   }
 
+  function compactForAgent(value, depth = 0) {
+    if (value === null || value === undefined) return value;
+    if (typeof value === "string") {
+      return value.length > 800 ? `${value.slice(0, 800)}...[truncated]` : value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") return value;
+    if (depth > 3) return "[max-depth]";
+    if (Array.isArray(value)) {
+      return value.slice(0, 40).map((item) => compactForAgent(item, depth + 1));
+    }
+    if (typeof value === "object") {
+      const out = {};
+      Object.entries(value)
+        .slice(0, 40)
+        .forEach(([key, val]) => {
+          out[key] = compactForAgent(val, depth + 1);
+        });
+      return out;
+    }
+    return String(value);
+  }
+
   function collectContext() {
     const includeKeys = [
       "todoTasks",
@@ -83,7 +105,7 @@
     ];
     const context = { generatedAt: new Date().toISOString(), page: window.location.pathname, data: {} };
     includeKeys.forEach((key) => {
-      context.data[key] = safeGet(key);
+      context.data[key] = compactForAgent(safeGet(key));
     });
     return context;
   }
