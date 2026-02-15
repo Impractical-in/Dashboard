@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
+    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Calendar</title>
     <link rel="stylesheet" href="css/calendar.css" />
   </head>
@@ -23,6 +25,9 @@
         <div class="view-toggle">
           <button class="btn" id="monthViewBtn" type="button">Month</button>
           <button class="btn" id="weekViewBtn" type="button">Week</button>
+          <button class="btn" id="weekZoomOutBtn" type="button">-</button>
+          <span id="weekIntervalLabel" class="detail-meta">30m</span>
+          <button class="btn" id="weekZoomInBtn" type="button">+</button>
         </div>
       </div>
       <div class="weekdays">
@@ -34,6 +39,7 @@
         <span>Sat</span>
         <span>Sun</span>
       </div>
+      <div class="detail-meta">Week view: drag tasks into slots, or click a task then click a slot/day to place it. Drop/click under Date only to keep date without time. Zoom supports 60m/30m/15m.</div>
       <div id="calendarGrid" class="calendar-grid"></div>
       <div id="weekView" class="week-view hidden"></div>
     </main>
@@ -48,7 +54,3 @@
       <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-

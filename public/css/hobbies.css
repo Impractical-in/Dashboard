@@ -210,6 +210,11 @@ option {
   box-shadow: 0 12px 24px rgba(34, 28, 22, 0.18);
 }
 
+.hobby-card.focused {
+  border-color: #1f4d8f;
+  box-shadow: 0 0 0 2px rgba(31, 77, 143, 0.2);
+}
+
 .hobby-calendar {
   display: grid;
   gap: 8px;

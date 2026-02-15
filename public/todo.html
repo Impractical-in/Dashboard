@@ -3,6 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
+    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>To-Do List</title>
     <link rel="stylesheet" href="css/todo.css" />
   </head>
@@ -18,7 +20,10 @@
     <main class="stack">
       <section class="card collapsible-card" id="taskFormCard">
         <div class="card-header">
-          <div class="section-title">Add a task</div>
+          <div>
+            <div class="section-title">Add a task</div>
+            <div class="task-meta">Click + to expand. Checklist is under Tags.</div>
+          </div>
           <button class="btn icon" id="taskFormToggle" type="button" aria-expanded="false">+</button>
         </div>
         <div class="collapsible collapsed" id="taskFormWrap">
@@ -53,6 +58,10 @@
           <label class="field">
             <span>Tags (comma separated)</span>
             <input id="taskTags" type="text" placeholder="errands, deep work, calls" />
+          </label>
+          <label class="field">
+            <span>Checklist (one item per line)</span>
+            <textarea id="taskChecklist" rows="4" placeholder="Break task into smaller steps..."></textarea>
           </label>
           <div class="field">
             <span>Linked items</span>
@@ -103,7 +112,5 @@
       <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
 
 
