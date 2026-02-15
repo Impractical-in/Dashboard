@@ -1,6 +1,12 @@
 # Changelog
 
-## v0.1.15 (Current)
+## v0.2.0 (Current)
+- Add calendar Quick Add panel to create one-off tasks and repeating task series directly in Calendar
+- Keep drag/drop, resize, linked-series edits, and origin navigation behavior intact
+- Add calendar custom color in Quick Add for new tasks
+- Set calendar default view to Week
+- Bump dashboard app version to `0.2.0`
+- Keep local agent chat version at `0.1``r`n`r`n## v0.1.15
 - Improve local agent reliability with clearer Ollama/model diagnostics in health checks
 - Improve agent chat error messages by returning actual Ollama error details
 - Reduce/trim agent context payload to avoid model failures on very large dashboard state
@@ -9,7 +15,7 @@
 - Rename backup tile and page to **Settings & Backup**
 - Bump app version to `0.1.15`
 
-## v0.1.4 (Current)
+## v0.1.4
 - Add server-side delta backups when state changes are significant ("great delta")
 - Keep only the latest 10 timestamped state backup files for redundancy
 - Keep state API backward compatible with older payload/file shapes
@@ -63,3 +69,5 @@
 - Tagging + linking across modules
 - Dark theme update and dropdown fixes
 - Home previews and layout refinements
+
+

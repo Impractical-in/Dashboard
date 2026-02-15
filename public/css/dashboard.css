@@ -320,6 +320,92 @@ option {
   padding: 8px 10px;
 }
 
+.calendar-dash {
+  display: grid;
+  gap: 8px;
+}
+
+.calendar-dash-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calendar-dash-board {
+  position: relative;
+  width: 100%;
+  min-height: 280px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 20px 20px,
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px) 0 0 / 20px 20px;
+  overflow: hidden;
+}
+
+.calendar-task-card {
+  position: absolute;
+  width: 220px;
+  min-height: 108px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(142, 201, 255, 0.35);
+  background: rgba(6, 16, 28, 0.95);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.25);
+  display: grid;
+  gap: 6px;
+  touch-action: none;
+  user-select: none;
+}
+
+.calendar-task-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: grab;
+}
+
+.calendar-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-task-row {
+  display: grid;
+  grid-template-columns: 38px 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-task-row label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calendar-task-row input {
+  font-size: 11px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(10, 24, 40, 0.9);
+}
+
+.calendar-clear-time {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 3px 8px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.calendar-clear-time:hover {
+  color: var(--text);
+}
+
 .tile.todo .tile-icon {
   background: rgba(212, 104, 61, 0.18);
 }
@@ -455,5 +541,9 @@ textarea {
 
   .top-focus {
     grid-column: auto;
+  }
+
+  .calendar-task-card {
+    width: min(220px, calc(100% - 10px));
   }
 }

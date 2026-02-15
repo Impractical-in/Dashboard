@@ -2,9 +2,9 @@ const form = document.getElementById("taskForm");
 const titleInput = document.getElementById("taskTitle");
 const priorityInput = document.getElementById("taskPriority");
 const dueInput = document.getElementById("taskDue");
+const taskColorInput = document.getElementById("taskColor");
 const notesInput = document.getElementById("taskNotes");
 const tagsInput = document.getElementById("taskTags");
-const checklistInput = document.getElementById("taskChecklist");
 const suggestions = document.getElementById("taskSuggestions");
 const linkedItems = document.getElementById("taskLinkedItems");
 const taskList = document.getElementById("taskList");
@@ -43,7 +43,7 @@ function loadTasks() {
     ...task,
     tags: Array.isArray(task.tags) ? task.tags : [],
     linkedItems: Array.isArray(task.linkedItems) ? task.linkedItems : [],
-    checklist: normalizeChecklist(task.checklist),
+    customColor: typeof task.customColor === "string" ? task.customColor : "",
   }));
 }
 
@@ -77,101 +77,6 @@ function formatDue(dateValue) {
   if (!dateValue) return "No due date";
   const date = parseDate(dateValue);
   return date ? date.toLocaleString() : "No due date";
-}
-
-function formatCompletedAt(dateValue) {
-  if (!dateValue) return "";
-  const date = parseDate(dateValue);
-  return date ? date.toLocaleString() : "";
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function normalizeChecklist(items) {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((item) => {
-      if (typeof item === "string") {
-        const text = item.trim();
-        if (!text) return null;
-        return { id: generateId(), text, done: false, completedAt: null };
-      }
-      if (!item || typeof item !== "object") return null;
-      const text = String(item.text || "").trim();
-      if (!text) return null;
-      const done = Boolean(item.done);
-      return {
-        id: item.id || generateId(),
-        text,
-        done,
-        completedAt: done ? item.completedAt || item.updatedAt || null : null,
-      };
-    })
-    .filter(Boolean);
-}
-
-function parseChecklistInput(value, existingChecklist = []) {
-  const lines = String(value || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const existing = [...normalizeChecklist(existingChecklist)];
-  return lines.map((text) => {
-    const index = existing.findIndex(
-      (item) => item.text.toLowerCase() === text.toLowerCase()
-    );
-    if (index !== -1) {
-      const [found] = existing.splice(index, 1);
-      return { ...found, text };
-    }
-    return { id: generateId(), text, done: false, completedAt: null };
-  });
-}
-
-function renderChecklist(task) {
-  const checklist = normalizeChecklist(task.checklist);
-  if (!checklist.length) return "";
-  const items = checklist
-    .map((item) => {
-      const completedAt = formatCompletedAt(item.completedAt);
-      return `
-      <label class="checklist-item ${item.done ? "done" : ""}">
-        <input type="checkbox" data-check-task="${task.id}" data-check-item="${item.id}" ${
-        item.done ? "checked" : ""
-      } />
-        <span class="checklist-content">
-          <span class="checklist-text">${escapeHtml(item.text)}</span>
-          <span class="checklist-time ${item.done && completedAt ? "" : "hidden"}">${
-        item.done && completedAt ? `Completed: ${escapeHtml(completedAt)}` : ""
-      }</span>
-        </span>
-      </label>`;
-    })
-    .join("");
-  return `<div class="checklist">${items}</div>`;
-}
-
-function renderArchiveChecklist(task) {
-  const checklist = normalizeChecklist(task.checklist);
-  if (!checklist.length) return "";
-  const items = checklist
-    .map((item) => {
-      const completedAt = formatCompletedAt(item.completedAt);
-      return `<li class="${item.done ? "done" : ""}">${escapeHtml(item.text)}${
-        item.done && completedAt
-          ? ` <span class="checklist-time">(Completed: ${escapeHtml(completedAt)})</span>`
-          : ""
-      }</li>`;
-    })
-    .join("");
-  return `<ul class="archive-checklist">${items}</ul>`;
 }
 
 function comparePriority(a, b) {
@@ -295,26 +200,6 @@ function renderArchive() {
   sorted.forEach((task) => {
     const item = document.createElement("div");
     item.className = "task";
-    const checklistHtml = renderArchiveChecklist(task);
-    const tagHtml = Array.isArray(task.tags) && task.tags.length
-      ? task.tags
-          .map(
-            (tag) =>
-              `<button class="tag tag-btn" type="button" data-tag-filter="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`
-          )
-          .join("")
-      : "<span class=\"task-meta\">No tags</span>";
-    const linkHtml = Array.isArray(task.linkedItems) && task.linkedItems.length
-      ? task.linkedItems
-          .map((link) => {
-            const found = linkItems.find((item) => `${item.source}:${item.id}` === link);
-            if (!found) return "<span class=\"link-pill\">Linked item</span>";
-            const href = linkHrefForItem(found);
-            if (!href) return `<span class="link-pill">${escapeHtml(found.label)}</span>`;
-            return `<a class="link-pill linked-nav" href="${href}">${escapeHtml(found.label)}</a>`;
-          })
-          .join("")
-      : "<span class=\"task-meta\">No linked items</span>";
     item.innerHTML = `
       <div class="task-header">
         <div class="task-title done">${task.title}</div>
@@ -324,12 +209,6 @@ function renderArchive() {
         task.completedAt ? new Date(task.completedAt).toLocaleString() : "Unknown"
       }</div>
       <div class="task-meta">${task.notes ? task.notes : "<em>No notes</em>"}</div>
-      <div>${tagHtml}</div>
-      ${checklistHtml}
-      <div>${linkHtml}</div>
-      <div class="task-actions">
-        <button class="btn" data-unarchive="${task.id}" type="button">Unarchive</button>
-      </div>
     `;
     archiveList.appendChild(item);
   });
@@ -362,35 +241,26 @@ function renderTasks() {
   sorted.forEach((task) => {
     const item = document.createElement("div");
     item.className = `task ${isOverdue(task) ? "overdue" : ""}`;
+    const colorDot = task.customColor ? `<span class="color-dot" style="background:${task.customColor}"></span>` : "";
     const tagHtml = Array.isArray(task.tags) && task.tags.length
-      ? task.tags
-          .map(
-            (tag) =>
-              `<button class="tag tag-btn" type="button" data-tag-filter="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`
-          )
-          .join("")
+      ? task.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")
       : "<span class=\"task-meta\">No tags</span>";
     const linkHtml = Array.isArray(task.linkedItems) && task.linkedItems.length
       ? task.linkedItems
           .map((link) => {
             const found = linkItems.find((item) => `${item.source}:${item.id}` === link);
-            if (!found) return "<span class=\"link-pill\">Linked item</span>";
-            const href = linkHrefForItem(found);
-            if (!href) return `<span class="link-pill">${escapeHtml(found.label)}</span>`;
-            return `<a class="link-pill linked-nav" href="${href}">${escapeHtml(found.label)}</a>`;
+            return found ? `<span class="link-pill">${found.label}</span>` : "<span class=\"link-pill\">Linked item</span>";
           })
           .join("")
       : "<span class=\"task-meta\">No linked items</span>";
-    const checklistHtml = renderChecklist(task);
     item.innerHTML = `
       <div class="task-header">
-        <div class="task-title ${task.done ? "done" : ""}">${task.title}</div>
+        <div class="task-title ${task.done ? "done" : ""}">${colorDot}${task.title}</div>
         <span class="badge ${task.priority.toLowerCase()}">${task.priority}</span>
       </div>
       <div class="task-meta">Due: ${formatDue(task.due)}</div>
       <div class="task-meta">${task.notes ? task.notes : "<em>No notes</em>"}</div>
       <div>${tagHtml}</div>
-      ${checklistHtml}
       <div>${linkHtml}</div>
       <div class="task-actions">
         <label>
@@ -419,8 +289,8 @@ function addTask(event) {
       task.due = dueInput.value;
       task.notes = notesInput.value.trim();
       task.tags = tags;
-      task.checklist = parseChecklistInput(checklistInput.value, task.checklist);
       task.linkedItems = [...currentLinks];
+      task.customColor = taskColorInput ? String(taskColorInput.value || "") : "";
     }
   } else {
     const task = {
@@ -430,8 +300,8 @@ function addTask(event) {
       due: dueInput.value,
       notes: notesInput.value.trim(),
       tags,
-      checklist: parseChecklistInput(checklistInput.value),
       linkedItems: [...currentLinks],
+      customColor: taskColorInput ? String(taskColorInput.value || "") : "",
       done: false,
       createdAt: new Date().toISOString(),
     };
@@ -441,6 +311,7 @@ function addTask(event) {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   editingId = null;
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
@@ -491,7 +362,7 @@ if (prevScheduleDayBtn && nextScheduleDayBtn && scheduleDateInput) {
   });
 }
 
-taskList.addEventListener("change", (event) => {
+taskList.addEventListener("click", (event) => {
   const target = event.target;
   if (target.matches("input[data-done]")) {
     const task = tasks.find((item) => item.id === target.dataset.done);
@@ -510,28 +381,6 @@ taskList.addEventListener("change", (event) => {
       renderArchive();
     }
   }
-  if (target.matches("input[data-check-task][data-check-item]")) {
-    const task = tasks.find((item) => item.id === target.dataset.checkTask);
-    if (!task || !Array.isArray(task.checklist)) return;
-    const checklistItem = task.checklist.find(
-      (item) => item.id === target.dataset.checkItem
-    );
-    if (!checklistItem) return;
-    checklistItem.done = target.checked;
-    checklistItem.completedAt = target.checked ? new Date().toISOString() : null;
-    saveTasks();
-    renderTasks();
-  }
-});
-
-taskList.addEventListener("click", (event) => {
-  const target = event.target;
-  if (target.matches("button[data-tag-filter]")) {
-    searchInput.value = target.dataset.tagFilter || "";
-    statusFilter.value = "all";
-    renderTasks();
-    return;
-  }
   if (target.matches("button[data-edit]")) {
     const task = tasks.find((item) => item.id === target.dataset.edit);
     if (task) {
@@ -540,10 +389,8 @@ taskList.addEventListener("click", (event) => {
       dueInput.value = task.due || "";
       notesInput.value = task.notes || "";
       tagsInput.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
-      checklistInput.value = Array.isArray(task.checklist)
-        ? task.checklist.map((item) => item.text).join("\n")
-        : "";
       currentLinks = Array.isArray(task.linkedItems) ? [...task.linkedItems] : [];
+      if (taskColorInput) taskColorInput.value = task.customColor || "#3f88c5";
       renderLinkedItems();
       editingId = task.id;
       taskDeleteBtn.classList.remove("hidden");
@@ -552,41 +399,6 @@ taskList.addEventListener("click", (event) => {
     }
   }
 });
-
-archiveList.addEventListener("click", (event) => {
-  const target = event.target;
-  if (target.matches("button[data-tag-filter]")) {
-    searchInput.value = target.dataset.tagFilter || "";
-    statusFilter.value = "all";
-    renderTasks();
-    return;
-  }
-  if (!target.matches("button[data-unarchive]")) return;
-  const taskId = target.dataset.unarchive;
-  const archivedTask = archive.find((task) => task.id === taskId);
-  if (!archivedTask) return;
-
-  const restoredTask = {
-    ...archivedTask,
-    done: false,
-    completedAt: null,
-  };
-  tasks = tasks.filter((task) => task.id !== taskId);
-  tasks.unshift(restoredTask);
-  archive = archive.filter((task) => task.id !== taskId);
-  saveTasks();
-  saveArchive();
-  renderTasks();
-  renderArchive();
-});
-
-function linkHrefForItem(item) {
-  if (!item || !item.source || !item.id) return "";
-  if (item.source === "project") return `projects.html?focus=${encodeURIComponent(item.id)}`;
-  if (item.source === "task") return `todo.html?focus=${encodeURIComponent(item.id)}`;
-  if (item.source === "hobby") return `hobbies.html?focus=${encodeURIComponent(item.id)}`;
-  return "";
-}
 
 initStorage().then(() => {
   tasks = loadTasks();
@@ -617,9 +429,8 @@ initStorage().then(() => {
   renderLinkedItems();
   const focusId = new URLSearchParams(window.location.search).get("focus");
   if (focusId) {
-    const activeMatch = taskList.querySelector(`[data-edit="${focusId}"]`);
-    const archiveMatch = archiveList.querySelector(`[data-unarchive="${focusId}"]`);
-    const row = (activeMatch || archiveMatch) ? (activeMatch || archiveMatch).closest(".task") : null;
+    const focused = taskList.querySelector(`[data-edit="${focusId}"]`);
+    const row = focused ? focused.closest(".task") : null;
     if (row) {
       row.classList.add("focused");
       row.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -636,6 +447,7 @@ taskDeleteBtn.addEventListener("click", () => {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   renderLinkedItems();
@@ -646,6 +458,7 @@ taskCancelBtn.addEventListener("click", () => {
   editingId = null;
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   renderLinkedItems();
@@ -807,3 +620,5 @@ window.addEventListener("focus", () => {
   renderTasks();
   renderLinkedItems();
 });
+
+
