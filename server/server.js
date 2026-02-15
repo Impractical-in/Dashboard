@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
 const DATA_DIR = path.join(__dirname, "..", "user_data");
 const STATE_FILE = path.join(DATA_DIR, "server_state.json");
+const USER_PROFILE_FILE = path.join(DATA_DIR, "user_name.json");
 const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
 const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
@@ -82,6 +83,15 @@ function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (!fs.existsSync(STATE_BACKUP_DIR)) fs.mkdirSync(STATE_BACKUP_DIR, { recursive: true });
   if (!fs.existsSync(STATE_BACKUP_BACKUP_DIR)) fs.mkdirSync(STATE_BACKUP_BACKUP_DIR, { recursive: true });
+}
+
+function readJsonFileSafe(filePath, fallback) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (err) {
+    return fallback;
+  }
 }
 
 function loadServerState() {
@@ -305,151 +315,143 @@ function sanitizeForAgent(value, depth = 0) {
   return String(value);
 }
 
-function safeArray(value) {
-  return Array.isArray(value) ? value : [];
+function toObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
 
-function tokenizeForSearch(value) {
-  const STOP = new Set([
-    "the","and","for","with","that","this","from","into","your","have","what","when","where","which","about","please","show","give","need","want","task","tasks","project","projects"
-  ]);
-  const raw = String(value || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-  const terms = [];
-  raw.forEach((t) => {
-    if (t.length < 2 || STOP.has(t)) return;
-    if (!terms.includes(t)) terms.push(t);
+function pickString(...values) {
+  for (let i = 0; i < values.length; i += 1) {
+    const v = values[i];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return "";
+}
+
+function loadLatestBackupState() {
+  ensureDataDir();
+  const collectFromDir = (dirPath, source) => {
+    if (!fs.existsSync(dirPath)) return [];
+    return fs
+      .readdirSync(dirPath)
+      .filter((name) => BACKUP_FILE_PATTERN.test(name))
+      .map((name) => {
+        const fullPath = path.join(dirPath, name);
+        const stat = fs.statSync(fullPath);
+        return { name, fullPath, source, mtimeMs: stat.mtimeMs };
+      });
+  };
+  const files = collectFromDir(STATE_BACKUP_DIR, "primary").concat(
+    collectFromDir(STATE_BACKUP_BACKUP_DIR, "secondary")
+  );
+  if (!files.length) return { data: {}, source: null, name: null, updatedAt: null };
+  files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const latest = files[0];
+  const envelope = readJsonFileSafe(latest.fullPath, null);
+  return {
+    data: extractStateData(envelope),
+    source: latest.source,
+    name: latest.name,
+    updatedAt: envelope && envelope.updatedAt ? String(envelope.updatedAt) : null,
+  };
+}
+
+function deriveProfileFromState(stateData) {
+  const state = toObject(stateData);
+  const appMeta = toObject(state.appMeta);
+  const user = toObject(state.user);
+  const profile = toObject(state.profile);
+  const settings = toObject(state.settings);
+  return sanitizeForAgent({
+    name: pickString(
+      profile.name,
+      user.name,
+      appMeta.userName,
+      appMeta.owner,
+      settings.userName
+    ),
+    timezone: pickString(
+      settings.timezone,
+      appMeta.timezone,
+      profile.timezone,
+      Intl.DateTimeFormat().resolvedOptions().timeZone
+    ),
+    focusAreas: Array.isArray(profile.focusAreas) ? profile.focusAreas.slice(0, 20) : [],
+    preferences: toObject(profile.preferences),
+    notes: pickString(profile.notes, user.notes),
   });
-  return terms.slice(0, 24);
 }
 
-function parseDateScore(value) {
-  const ts = Date.parse(String(value || ""));
-  return Number.isFinite(ts) ? ts : 0;
+function loadUserProfileEnvelope() {
+  ensureDataDir();
+  const raw = readJsonFileSafe(USER_PROFILE_FILE, null);
+  if (raw && typeof raw === "object" && raw.profile && typeof raw.profile === "object") {
+    return raw;
+  }
+  if (raw && typeof raw === "object") {
+    return {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      profile: raw,
+      readOnlyForLLM: true,
+    };
+  }
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    profile: {},
+    readOnlyForLLM: true,
+  };
 }
 
-function rankItemsForQuestion(items, toText, questionTerms, limit = 10) {
-  const scored = safeArray(items).map((item) => {
-    const text = String(toText(item) || "").toLowerCase();
-    let score = 0;
-    questionTerms.forEach((term) => {
-      if (!term) return;
-      if (text.includes(term)) score += term.length >= 5 ? 2 : 1;
-    });
-    const recency = parseDateScore(item && (item.updatedAt || item.createdAt || item.due || item.startDate || item.endDate));
-    return { item, score, recency };
+function saveUserProfileEnvelope(envelope) {
+  ensureDataDir();
+  const payload = {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    readOnlyForLLM: true,
+    profile: toObject(envelope && envelope.profile),
+  };
+  fs.writeFileSync(USER_PROFILE_FILE, JSON.stringify(payload, null, 2), "utf8");
+  return payload;
+}
+
+function buildAgentContextForQuestion() {
+  const currentState = loadServerState();
+  const backup = loadLatestBackupState();
+  const stateData = Object.keys(currentState).length ? currentState : toObject(backup.data);
+
+  const existingProfileEnvelope = loadUserProfileEnvelope();
+  const derivedProfile = deriveProfileFromState(stateData);
+  const mergedProfile = {
+    ...derivedProfile,
+    ...toObject(existingProfileEnvelope.profile),
+  };
+  const storedProfile = saveUserProfileEnvelope({ profile: mergedProfile });
+
+  const stateKeys = Object.keys(toObject(stateData));
+  const sectionCounts = {};
+  stateKeys.slice(0, 80).forEach((key) => {
+    const value = stateData[key];
+    if (Array.isArray(value)) sectionCounts[key] = value.length;
   });
-
-  const relevant = scored.filter((x) => x.score > 0);
-  const source = relevant.length ? relevant : scored;
-  return source
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return b.recency - a.recency;
-    })
-    .slice(0, Math.max(1, limit))
-    .map((x) => x.item);
-}
-
-function summarizeTask(task) {
-  if (!task || typeof task !== "object") return null;
-  return {
-    id: task.id || "",
-    title: task.title || "Untitled",
-    due: task.due || "",
-    priority: task.priority || "",
-    done: Boolean(task.done),
-    tags: safeArray(task.tags).slice(0, 8),
-    notes: task.notes || "",
-  };
-}
-
-function summarizeProject(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  return {
-    id: entry.id || "",
-    type: entry.type || "Project",
-    title: entry.title || "Untitled",
-    startDate: entry.startDate || "",
-    endDate: entry.endDate || "",
-    scheduleDays: safeArray(entry.scheduleDays).slice(0, 7),
-    notes: entry.notes || "",
-    tags: safeArray(entry.tags).slice(0, 8),
-  };
-}
-
-function summarizeJournal(entry) {
-  if (!entry || typeof entry !== "object") return null;
-  return {
-    id: entry.id || "",
-    title: entry.title || "",
-    content: entry.content || entry.text || "",
-    tags: safeArray(entry.tags).slice(0, 8),
-    createdAt: entry.createdAt || entry.updatedAt || "",
-  };
-}
-
-function buildAgentContextForQuestion(question, serverState, clientContext) {
-  const data = serverState && typeof serverState === "object" ? serverState : {};
-  const terms = tokenizeForSearch(question);
-
-  const tasks = safeArray(data.todoTasks);
-  const archivedTasks = safeArray(data.todoArchive);
-  const projects = safeArray(data.dashboardEntries);
-  const hobbies = safeArray(data.hobbyTracker && data.hobbyTracker.hobbies);
-  const journal = safeArray(data.journalEntries);
-  const links = safeArray(data.quickLinks);
-  const pomodoro = safeArray(data.localPomodoroLogs);
-
-  const rankedTasks = rankItemsForQuestion(
-    tasks,
-    (t) => `${t && t.title ? t.title : ""} ${t && t.notes ? t.notes : ""} ${safeArray(t && t.tags).join(" ")} ${t && t.due ? t.due : ""} ${t && t.priority ? t.priority : ""}`,
-    terms,
-    12
-  ).map(summarizeTask).filter(Boolean);
-
-  const rankedArchived = rankItemsForQuestion(
-    archivedTasks,
-    (t) => `${t && t.title ? t.title : ""} ${t && t.notes ? t.notes : ""} ${safeArray(t && t.tags).join(" ")} ${t && t.due ? t.due : ""}`,
-    terms,
-    8
-  ).map(summarizeTask).filter(Boolean);
-
-  const rankedProjects = rankItemsForQuestion(
-    projects,
-    (p) => `${p && p.type ? p.type : ""} ${p && p.title ? p.title : ""} ${p && p.notes ? p.notes : ""} ${safeArray(p && p.tags).join(" ")}`,
-    terms,
-    10
-  ).map(summarizeProject).filter(Boolean);
-
-  const rankedJournal = rankItemsForQuestion(
-    journal,
-    (j) => `${j && j.title ? j.title : ""} ${j && (j.content || j.text) ? (j.content || j.text) : ""} ${safeArray(j && j.tags).join(" ")}`,
-    terms,
-    6
-  ).map(summarizeJournal).filter(Boolean);
 
   return sanitizeForAgent({
     generatedAt: new Date().toISOString(),
-    page: (clientContext && clientContext.page) || "",
-    questionTerms: terms,
-    summary: {
-      totalTasks: tasks.length,
-      totalArchivedTasks: archivedTasks.length,
-      totalProjects: projects.length,
-      totalHobbies: hobbies.length,
-      totalJournalEntries: journal.length,
-      totalLinks: links.length,
-      totalPomodoroLogs: pomodoro.length,
-    },
-    tasks: rankedTasks,
-    archivedTasks: rankedArchived,
-    projects: rankedProjects,
-    hobbies: rankItemsForQuestion(hobbies, (h) => `${h && h.name ? h.name : ""} ${safeArray(h && h.tags).join(" ")}`, terms, 8),
-    journal: rankedJournal,
-    links: rankItemsForQuestion(links, (l) => `${l && l.title ? l.title : ""} ${l && l.url ? l.url : ""}`, terms, 8),
-    pomodoro: rankItemsForQuestion(pomodoro, (p) => `${p && p.note ? p.note : ""} ${p && p.date ? p.date : ""}`, terms, 8),
+    readOnly: true,
+    profileFile: path.basename(USER_PROFILE_FILE),
+    profile: storedProfile.profile,
+    stateSource: Object.keys(currentState).length
+      ? "server_state.json"
+      : backup.name
+        ? `${backup.source}:${backup.name}`
+        : "none",
+    stateUpdatedAt: backup.updatedAt || null,
+    stateKeys,
+    sectionCounts,
+    stateData,
   });
 }
+
 function getContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".html") return "text/html; charset=utf-8";
@@ -581,11 +583,13 @@ const server = http.createServer(async (req, res) => {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
       const question = String(payload.question || "").trim();
-      const context = payload.context && typeof payload.context === "object" ? sanitizeForAgent(payload.context) : {};
       if (!question) return send(res, 400, { error: "missing_question" });
+      const context = buildAgentContextForQuestion();
 
       const systemPrompt =
-        "You are a local assistant for a personal dashboard. Use the provided dashboard context first. " +
+        "You are a local assistant for a personal dashboard. You have read-only access to dashboard context. " +
+        "Never claim to modify files, server state, or tasks directly. Provide guidance only. " +
+        "Use the provided dashboard context first, including user_name.json profile and server_state backup snapshot. " +
         "Be concise and actionable. Keep answers under 6 short bullet points unless asked for detail. " +
         "If data is missing, say what is missing.";
 
@@ -684,4 +688,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Dashboard server running on http://0.0.0.0:${PORT}`);
 });
-
