@@ -22,6 +22,8 @@ const AGENT_PROMPT_CONTEXT_LIMIT = Math.max(
   5000,
   Number(process.env.DASHBOARD_AGENT_CONTEXT_PROMPT_LIMIT || 50000)
 );
+const AGENT_MAX_PREDICT = Math.max(32, Number(process.env.DASHBOARD_AGENT_MAX_PREDICT || 160));
+const AGENT_KEEP_ALIVE = process.env.DASHBOARD_AGENT_KEEP_ALIVE || "30m";
 
 function getOllamaBases() {
   const bases = [
@@ -37,9 +39,17 @@ async function fetchFromOllama(pathname, options = {}) {
   const errors = [];
   for (const base of bases) {
     try {
+      if (options.signal && options.signal.aborted) {
+        const abortErr = new Error("The operation was aborted");
+        abortErr.name = "AbortError";
+        throw abortErr;
+      }
       const response = await fetch(`${base}${pathname}`, options);
       return { response, base, errors };
     } catch (err) {
+      if ((err && err.name === "AbortError") || (options.signal && options.signal.aborted)) {
+        throw err;
+      }
       const message = err && err.message ? err.message : "unknown_error";
       errors.push(`${base}: ${message}`);
     }
@@ -431,7 +441,8 @@ const server = http.createServer(async (req, res) => {
 
       const systemPrompt =
         "You are a local assistant for a personal dashboard. Use the provided dashboard context first. " +
-        "Be concise and actionable. If data is missing, say what is missing.";
+        "Be concise and actionable. Keep answers under 6 short bullet points unless asked for detail. " +
+        "If data is missing, say what is missing.";
 
       const contextVariants = [
         JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
@@ -461,6 +472,10 @@ const server = http.createServer(async (req, res) => {
                 { role: "user", content: userPrompt },
               ],
               stream: false,
+              keep_alive: AGENT_KEEP_ALIVE,
+              options: {
+                num_predict: AGENT_MAX_PREDICT,
+              },
             }),
             signal: controller.signal,
           });
