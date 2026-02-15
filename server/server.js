@@ -305,6 +305,151 @@ function sanitizeForAgent(value, depth = 0) {
   return String(value);
 }
 
+function safeArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function tokenizeForSearch(value) {
+  const STOP = new Set([
+    "the","and","for","with","that","this","from","into","your","have","what","when","where","which","about","please","show","give","need","want","task","tasks","project","projects"
+  ]);
+  const raw = String(value || "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const terms = [];
+  raw.forEach((t) => {
+    if (t.length < 2 || STOP.has(t)) return;
+    if (!terms.includes(t)) terms.push(t);
+  });
+  return terms.slice(0, 24);
+}
+
+function parseDateScore(value) {
+  const ts = Date.parse(String(value || ""));
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function rankItemsForQuestion(items, toText, questionTerms, limit = 10) {
+  const scored = safeArray(items).map((item) => {
+    const text = String(toText(item) || "").toLowerCase();
+    let score = 0;
+    questionTerms.forEach((term) => {
+      if (!term) return;
+      if (text.includes(term)) score += term.length >= 5 ? 2 : 1;
+    });
+    const recency = parseDateScore(item && (item.updatedAt || item.createdAt || item.due || item.startDate || item.endDate));
+    return { item, score, recency };
+  });
+
+  const relevant = scored.filter((x) => x.score > 0);
+  const source = relevant.length ? relevant : scored;
+  return source
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return b.recency - a.recency;
+    })
+    .slice(0, Math.max(1, limit))
+    .map((x) => x.item);
+}
+
+function summarizeTask(task) {
+  if (!task || typeof task !== "object") return null;
+  return {
+    id: task.id || "",
+    title: task.title || "Untitled",
+    due: task.due || "",
+    priority: task.priority || "",
+    done: Boolean(task.done),
+    tags: safeArray(task.tags).slice(0, 8),
+    notes: task.notes || "",
+  };
+}
+
+function summarizeProject(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  return {
+    id: entry.id || "",
+    type: entry.type || "Project",
+    title: entry.title || "Untitled",
+    startDate: entry.startDate || "",
+    endDate: entry.endDate || "",
+    scheduleDays: safeArray(entry.scheduleDays).slice(0, 7),
+    notes: entry.notes || "",
+    tags: safeArray(entry.tags).slice(0, 8),
+  };
+}
+
+function summarizeJournal(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  return {
+    id: entry.id || "",
+    title: entry.title || "",
+    content: entry.content || entry.text || "",
+    tags: safeArray(entry.tags).slice(0, 8),
+    createdAt: entry.createdAt || entry.updatedAt || "",
+  };
+}
+
+function buildAgentContextForQuestion(question, serverState, clientContext) {
+  const data = serverState && typeof serverState === "object" ? serverState : {};
+  const terms = tokenizeForSearch(question);
+
+  const tasks = safeArray(data.todoTasks);
+  const archivedTasks = safeArray(data.todoArchive);
+  const projects = safeArray(data.dashboardEntries);
+  const hobbies = safeArray(data.hobbyTracker && data.hobbyTracker.hobbies);
+  const journal = safeArray(data.journalEntries);
+  const links = safeArray(data.quickLinks);
+  const pomodoro = safeArray(data.localPomodoroLogs);
+
+  const rankedTasks = rankItemsForQuestion(
+    tasks,
+    (t) => `${t && t.title ? t.title : ""} ${t && t.notes ? t.notes : ""} ${safeArray(t && t.tags).join(" ")} ${t && t.due ? t.due : ""} ${t && t.priority ? t.priority : ""}`,
+    terms,
+    12
+  ).map(summarizeTask).filter(Boolean);
+
+  const rankedArchived = rankItemsForQuestion(
+    archivedTasks,
+    (t) => `${t && t.title ? t.title : ""} ${t && t.notes ? t.notes : ""} ${safeArray(t && t.tags).join(" ")} ${t && t.due ? t.due : ""}`,
+    terms,
+    8
+  ).map(summarizeTask).filter(Boolean);
+
+  const rankedProjects = rankItemsForQuestion(
+    projects,
+    (p) => `${p && p.type ? p.type : ""} ${p && p.title ? p.title : ""} ${p && p.notes ? p.notes : ""} ${safeArray(p && p.tags).join(" ")}`,
+    terms,
+    10
+  ).map(summarizeProject).filter(Boolean);
+
+  const rankedJournal = rankItemsForQuestion(
+    journal,
+    (j) => `${j && j.title ? j.title : ""} ${j && (j.content || j.text) ? (j.content || j.text) : ""} ${safeArray(j && j.tags).join(" ")}`,
+    terms,
+    6
+  ).map(summarizeJournal).filter(Boolean);
+
+  return sanitizeForAgent({
+    generatedAt: new Date().toISOString(),
+    page: (clientContext && clientContext.page) || "",
+    questionTerms: terms,
+    summary: {
+      totalTasks: tasks.length,
+      totalArchivedTasks: archivedTasks.length,
+      totalProjects: projects.length,
+      totalHobbies: hobbies.length,
+      totalJournalEntries: journal.length,
+      totalLinks: links.length,
+      totalPomodoroLogs: pomodoro.length,
+    },
+    tasks: rankedTasks,
+    archivedTasks: rankedArchived,
+    projects: rankedProjects,
+    hobbies: rankItemsForQuestion(hobbies, (h) => `${h && h.name ? h.name : ""} ${safeArray(h && h.tags).join(" ")}`, terms, 8),
+    journal: rankedJournal,
+    links: rankItemsForQuestion(links, (l) => `${l && l.title ? l.title : ""} ${l && l.url ? l.url : ""}`, terms, 8),
+    pomodoro: rankItemsForQuestion(pomodoro, (p) => `${p && p.note ? p.note : ""} ${p && p.date ? p.date : ""}`, terms, 8),
+  });
+}
 function getContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".html") return "text/html; charset=utf-8";
@@ -539,3 +684,4 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`Dashboard server running on http://0.0.0.0:${PORT}`);
 });
+
