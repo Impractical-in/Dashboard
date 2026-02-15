@@ -265,10 +265,11 @@
         await checkAgentHealth();
       }
       const base = agentBaseUrl || window.location.origin;
-      let contextPayload = collectContext();
-      if (!hasMeaningfulContextData(contextPayload.data)) {
-        contextPayload = await enrichContextFromServer(base, contextPayload);
-      }
+      const contextPayload = {
+        generatedAt: new Date().toISOString(),
+        page: window.location.pathname,
+        data: {},
+      };
       const response = await fetch(`${base}/api/agent/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,5 +319,6 @@
     }
   });
 })();
+
 
 
