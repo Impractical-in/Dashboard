@@ -2,6 +2,7 @@ const form = document.getElementById("taskForm");
 const titleInput = document.getElementById("taskTitle");
 const priorityInput = document.getElementById("taskPriority");
 const dueInput = document.getElementById("taskDue");
+const taskColorInput = document.getElementById("taskColor");
 const notesInput = document.getElementById("taskNotes");
 const tagsInput = document.getElementById("taskTags");
 const suggestions = document.getElementById("taskSuggestions");
@@ -42,6 +43,7 @@ function loadTasks() {
     ...task,
     tags: Array.isArray(task.tags) ? task.tags : [],
     linkedItems: Array.isArray(task.linkedItems) ? task.linkedItems : [],
+    customColor: typeof task.customColor === "string" ? task.customColor : "",
   }));
 }
 
@@ -239,6 +241,7 @@ function renderTasks() {
   sorted.forEach((task) => {
     const item = document.createElement("div");
     item.className = `task ${isOverdue(task) ? "overdue" : ""}`;
+    const colorDot = task.customColor ? `<span class="color-dot" style="background:${task.customColor}"></span>` : "";
     const tagHtml = Array.isArray(task.tags) && task.tags.length
       ? task.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")
       : "<span class=\"task-meta\">No tags</span>";
@@ -252,7 +255,7 @@ function renderTasks() {
       : "<span class=\"task-meta\">No linked items</span>";
     item.innerHTML = `
       <div class="task-header">
-        <div class="task-title ${task.done ? "done" : ""}">${task.title}</div>
+        <div class="task-title ${task.done ? "done" : ""}">${colorDot}${task.title}</div>
         <span class="badge ${task.priority.toLowerCase()}">${task.priority}</span>
       </div>
       <div class="task-meta">Due: ${formatDue(task.due)}</div>
@@ -287,6 +290,7 @@ function addTask(event) {
       task.notes = notesInput.value.trim();
       task.tags = tags;
       task.linkedItems = [...currentLinks];
+      task.customColor = taskColorInput ? String(taskColorInput.value || "") : "";
     }
   } else {
     const task = {
@@ -297,6 +301,7 @@ function addTask(event) {
       notes: notesInput.value.trim(),
       tags,
       linkedItems: [...currentLinks],
+      customColor: taskColorInput ? String(taskColorInput.value || "") : "",
       done: false,
       createdAt: new Date().toISOString(),
     };
@@ -306,6 +311,7 @@ function addTask(event) {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   editingId = null;
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
@@ -384,6 +390,7 @@ taskList.addEventListener("click", (event) => {
       notesInput.value = task.notes || "";
       tagsInput.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
       currentLinks = Array.isArray(task.linkedItems) ? [...task.linkedItems] : [];
+      if (taskColorInput) taskColorInput.value = task.customColor || "#3f88c5";
       renderLinkedItems();
       editingId = task.id;
       taskDeleteBtn.classList.remove("hidden");
@@ -440,6 +447,7 @@ taskDeleteBtn.addEventListener("click", () => {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   renderLinkedItems();
@@ -450,6 +458,7 @@ taskCancelBtn.addEventListener("click", () => {
   editingId = null;
   form.reset();
   priorityInput.value = "P2";
+  if (taskColorInput) taskColorInput.value = "#3f88c5";
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   renderLinkedItems();
@@ -611,3 +620,5 @@ window.addEventListener("focus", () => {
   renderTasks();
   renderLinkedItems();
 });
+
+

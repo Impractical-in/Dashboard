@@ -1,4 +1,4 @@
-﻿# Local backup exports
+# Local backup exports
 /dashboard-backup.json
 **/dashboard-backup.json
 
@@ -21,3 +21,13 @@ script_test/.dashboard-server.pid
 script_test/.dashboard-ollama.pid
 working_server_version/script_test/.dashboard-server.pid
 working_server_version/script_test/.dashboard-ollama.pid
+
+# Extra safety: do not commit local runtime stats/state exports
+/dashboard.json
+**/dashboard.json
+/dashboard*.json
+**/dashboard*.json
+/server_stats*.json
+**/server_stats*.json
+/dserver_stats*.json
+**/dserver_stats*.json

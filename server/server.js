@@ -9,12 +9,55 @@ const STATE_FILE = path.join(DATA_DIR, "server_state.json");
 const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
 const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
+const AGENT_VERSION = "v0.1";
+const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;
 const GREAT_DELTA_KEY_RATIO = 0.3;
 const BACKUP_FILE_PATTERN = /^server_state_\d{8}_\d{6}\.\d{3}_\d{3}(?:_[a-zA-Z0-9._-]+)?\.json$/;
 const AGENT_CONTEXT_MAX_ITEMS = 40;
 const AGENT_CONTEXT_MAX_STRING = 3000;
+const AGENT_TIMEOUT_MS = Math.max(10000, Number(process.env.DASHBOARD_AGENT_TIMEOUT_MS || 90000));
+const AGENT_PROMPT_CONTEXT_LIMIT = Math.max(
+  5000,
+  Number(process.env.DASHBOARD_AGENT_CONTEXT_PROMPT_LIMIT || 50000)
+);
+const AGENT_MAX_PREDICT = Math.max(32, Number(process.env.DASHBOARD_AGENT_MAX_PREDICT || 160));
+const AGENT_KEEP_ALIVE = process.env.DASHBOARD_AGENT_KEEP_ALIVE || "30m";
+
+function getOllamaBases() {
+  const bases = [
+    OLLAMA_BASE,
+    "http://127.0.0.1:11434",
+    "http://localhost:11434",
+  ];
+  return Array.from(new Set(bases.filter(Boolean)));
+}
+
+async function fetchFromOllama(pathname, options = {}) {
+  const bases = getOllamaBases();
+  const errors = [];
+  for (const base of bases) {
+    try {
+      if (options.signal && options.signal.aborted) {
+        const abortErr = new Error("The operation was aborted");
+        abortErr.name = "AbortError";
+        throw abortErr;
+      }
+      const response = await fetch(`${base}${pathname}`, options);
+      return { response, base, errors };
+    } catch (err) {
+      if ((err && err.name === "AbortError") || (options.signal && options.signal.aborted)) {
+        throw err;
+      }
+      const message = err && err.message ? err.message : "unknown_error";
+      errors.push(`${base}: ${message}`);
+    }
+  }
+  const finalError = new Error(errors.join(" | ") || "ollama_unreachable");
+  finalError.name = "OllamaUnavailableError";
+  throw finalError;
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -366,19 +409,25 @@ const server = http.createServer(async (req, res) => {
 
   if (pathname === "/api/agent/health" && req.method === "GET") {
     try {
-      const response = await fetch("http://127.0.0.1:11434/api/tags");
+      const { response, base } = await fetchFromOllama("/api/tags");
       if (!response.ok) return send(res, 502, { ok: false, error: "ollama_unavailable" });
       const payload = await response.json();
       const modelNames = Array.isArray(payload.models) ? payload.models.map((m) => m.name) : [];
       const modelAvailable = modelNames.includes(AGENT_MODEL);
       return send(res, 200, {
         ok: true,
+        agentVersion: AGENT_VERSION,
         model: AGENT_MODEL,
         modelAvailable,
+        base,
         detail: modelAvailable ? "ready" : `model_missing:${AGENT_MODEL}`,
       });
     } catch (err) {
-      return send(res, 502, { ok: false, error: "ollama_unavailable" });
+      return send(res, 502, {
+        ok: false,
+        error: "ollama_unavailable",
+        detail: err && err.message ? truncateString(err.message, 400) : "unreachable",
+      });
     }
   }
 
@@ -390,54 +439,95 @@ const server = http.createServer(async (req, res) => {
       const context = payload.context && typeof payload.context === "object" ? sanitizeForAgent(payload.context) : {};
       if (!question) return send(res, 400, { error: "missing_question" });
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
-
       const systemPrompt =
         "You are a local assistant for a personal dashboard. Use the provided dashboard context first. " +
-        "Be concise and actionable. If data is missing, say what is missing.";
+        "Be concise and actionable. Keep answers under 6 short bullet points unless asked for detail. " +
+        "If data is missing, say what is missing.";
 
-      const userPrompt = [
-        "Dashboard context JSON:",
-        JSON.stringify(context).slice(0, 180000),
-        "",
-        `Question: ${question}`,
-      ].join("\n");
+      const contextVariants = [
+        JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
+        JSON.stringify({ generatedAt: new Date().toISOString(), page: context.page || "", data: {} }),
+      ];
 
-      const response = await fetch("http://127.0.0.1:11434/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: AGENT_MODEL,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt },
-          ],
-          stream: false,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
+      let lastError = null;
+      for (let attempt = 0; attempt < contextVariants.length; attempt += 1) {
+        const attemptTimeout = attempt === 0 ? AGENT_TIMEOUT_MS : Math.max(AGENT_TIMEOUT_MS, 120000);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), attemptTimeout);
+        const userPrompt = [
+          "Dashboard context JSON:",
+          contextVariants[attempt],
+          "",
+          `Question: ${question}`,
+        ].join("\n");
 
-      if (!response.ok) {
-        const body = await response.text();
-        return send(res, 502, {
-          error: "agent_unavailable",
-          detail: truncateString(body || "Ollama returned an error", 400),
+        try {
+          const { response, base } = await fetchFromOllama("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: AGENT_MODEL,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              stream: false,
+              keep_alive: AGENT_KEEP_ALIVE,
+              options: {
+                num_predict: AGENT_MAX_PREDICT,
+              },
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const body = await response.text();
+            return send(res, 502, {
+              error: "agent_unavailable",
+              detail: truncateString(body || "Ollama returned an error", 400),
+              agentVersion: AGENT_VERSION,
+            });
+          }
+
+          const result = await response.json();
+          const reply = result && result.message && result.message.content ? result.message.content : "";
+          if (!reply) {
+            lastError = new Error("empty_reply");
+            continue;
+          }
+          return send(res, 200, {
+            reply,
+            model: AGENT_MODEL,
+            source: "ollama",
+            base,
+            agentVersion: AGENT_VERSION,
+            attempt: attempt + 1,
+          });
+        } catch (err) {
+          clearTimeout(timeoutId);
+          lastError = err;
+          if (!(err && err.name === "AbortError")) {
+            break;
+          }
+        }
+      }
+
+      if (lastError && lastError.name === "AbortError") {
+        return send(res, 504, {
+          error: "agent_timeout",
+          detail: `Agent timed out after retries. Base timeout ${AGENT_TIMEOUT_MS}ms.`,
+          agentVersion: AGENT_VERSION,
         });
       }
-
-      const result = await response.json();
-      const reply = result && result.message && result.message.content ? result.message.content : "";
-      if (!reply) return send(res, 502, { error: "empty_reply" });
-      return send(res, 200, { reply, model: AGENT_MODEL, source: "ollama" });
+      throw lastError || new Error("agent_failed");
     } catch (err) {
-      if (err && err.name === "AbortError") {
-        return send(res, 504, { error: "agent_timeout", detail: "Agent response timed out." });
-      }
       return send(res, 502, {
         error: "agent_unavailable",
-        detail: err && err.message ? err.message : "Start Ollama locally (http://127.0.0.1:11434) and pull a model.",
+        agentVersion: AGENT_VERSION,
+        detail: err && err.message
+          ? truncateString(err.message, 400)
+          : "Ollama reachable check failed",
       });
     }
   }

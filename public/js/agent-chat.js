@@ -25,7 +25,7 @@
   panel.className = "agent-chat-panel";
   panel.innerHTML = `
     <div class="agent-chat-head">
-      <strong>Local Agent</strong>
+      <strong id="agentTitle">Local Agent v0.1</strong>
       <button type="button" data-close aria-label="Close">x</button>
     </div>
     <div class="agent-chat-log" id="agentChatLog"></div>
@@ -45,10 +45,12 @@
   document.body.appendChild(launcher);
 
   const log = panel.querySelector("#agentChatLog");
+  const titleEl = panel.querySelector("#agentTitle");
   const input = panel.querySelector("#agentChatInput");
   const sendBtn = panel.querySelector("#agentChatSend");
   const closeBtn = panel.querySelector("[data-close]");
   let agentBaseUrl = "";
+  let agentVersion = "v0.1";
 
   function pushMessage(kind, text) {
     const item = document.createElement("div");
@@ -68,6 +70,28 @@
     }
   }
 
+  function compactForAgent(value, depth = 0) {
+    if (value === null || value === undefined) return value;
+    if (typeof value === "string") {
+      return value.length > 800 ? `${value.slice(0, 800)}...[truncated]` : value;
+    }
+    if (typeof value === "number" || typeof value === "boolean") return value;
+    if (depth > 3) return "[max-depth]";
+    if (Array.isArray(value)) {
+      return value.slice(0, 40).map((item) => compactForAgent(item, depth + 1));
+    }
+    if (typeof value === "object") {
+      const out = {};
+      Object.entries(value)
+        .slice(0, 40)
+        .forEach(([key, val]) => {
+          out[key] = compactForAgent(val, depth + 1);
+        });
+      return out;
+    }
+    return String(value);
+  }
+
   function collectContext() {
     const includeKeys = [
       "todoTasks",
@@ -81,14 +105,26 @@
     ];
     const context = { generatedAt: new Date().toISOString(), page: window.location.pathname, data: {} };
     includeKeys.forEach((key) => {
-      context.data[key] = safeGet(key);
+      context.data[key] = compactForAgent(safeGet(key));
     });
     return context;
   }
 
   function getCandidateBases() {
-    const bases = [window.location.origin, "http://127.0.0.1:8080", "http://localhost:8080"];
-    return Array.from(new Set(bases.filter(Boolean)));
+    const origin = window.location.origin;
+    const hostname = window.location.hostname;
+    const isHttpOrigin = /^https?:\/\//i.test(origin);
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1";
+
+    if (isHttpOrigin && !isLocalHost) {
+      return [origin];
+    }
+
+    const bases = [origin, "http://127.0.0.1:8080", "http://localhost:8080"];
+    return Array.from(new Set(bases.filter((base) => /^https?:\/\//i.test(base))));
   }
 
   async function checkAgentHealth() {
@@ -99,10 +135,14 @@
         const data = await response.json();
         if (response.ok && data.ok) {
           agentBaseUrl = base;
+          if (data.agentVersion) {
+            agentVersion = String(data.agentVersion);
+            if (titleEl) titleEl.textContent = `Local Agent ${agentVersion}`;
+          }
           if (data.modelAvailable === false) {
             return `Connected, but model missing: ${data.model}. Run: ollama pull ${data.model}`;
           }
-          return `Connected (${data.model || "local model"})`;
+          return `Connected (${data.model || "local model"}) via ${base} [${agentVersion}]`;
         }
       } catch (err) {
         // Try next candidate base.
@@ -119,6 +159,9 @@
     const pending = pushMessage("bot", "Thinking...");
     sendBtn.disabled = true;
     try {
+      if (!agentBaseUrl) {
+        await checkAgentHealth();
+      }
       const base = agentBaseUrl || window.location.origin;
       const response = await fetch(`${base}/api/agent/chat`, {
         method: "POST",
@@ -141,7 +184,7 @@
     panel.classList.toggle("open");
     if (panel.classList.contains("open")) {
       if (!log.children.length) {
-        pushMessage("bot", "Local agent ready. I can answer using your dashboard data on this browser.");
+        pushMessage("bot", `Local agent ready (${agentVersion}). I can answer using your dashboard data on this browser.`);
       }
       checkAgentHealth().then((text) => {
         pushMessage("bot", text);

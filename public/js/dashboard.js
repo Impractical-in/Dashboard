@@ -90,17 +90,53 @@ setInterval(updateLocalTime, 1000 * 30);
 
 const PREVIEW_LIMIT = 3;
 const previewTargets = Array.from(document.querySelectorAll("[data-preview]"));
+const dashboardMemoryStore = {};
+let browserStorageAvailableCache = null;
+
+function isBrowserStorageAvailable() {
+  if (browserStorageAvailableCache !== null) return browserStorageAvailableCache;
+  try {
+    const probeKey = "__dashboard_probe__";
+    localStorage.setItem(probeKey, "1");
+    localStorage.removeItem(probeKey);
+    browserStorageAvailableCache = true;
+  } catch (err) {
+    browserStorageAvailableCache = false;
+  }
+  return browserStorageAvailableCache;
+}
+
+function saveToStorage(key, value) {
+  if (isBrowserStorageAvailable()) {
+    try {
+      if (typeof saveData === "function") {
+        saveData(key, value);
+        return;
+      }
+      localStorage.setItem(key, JSON.stringify(value));
+      return;
+    } catch (err) {
+      // Fallback to in-memory store when browser storage is blocked.
+    }
+  }
+  dashboardMemoryStore[key] = value;
+}
 
 function loadFromStorage(key, fallback) {
-  if (typeof loadData === "function") return loadData(key, fallback);
-  const raw = localStorage.getItem(key);
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch (err) {
-    return fallback;
+  if (isBrowserStorageAvailable()) {
+    try {
+      if (typeof loadData === "function") return loadData(key, fallback);
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed ?? fallback;
+    } catch (err) {
+      // Fallback to in-memory store.
+    }
   }
+  return Object.prototype.hasOwnProperty.call(dashboardMemoryStore, key)
+    ? dashboardMemoryStore[key]
+    : fallback;
 }
 
 function formatShortDate(value, includeTime) {
@@ -354,79 +390,372 @@ function isWithinDateRange(date, startValue, endValue) {
   return date >= start && date <= end;
 }
 
-function renderCalendarPreview(target) {
-  const tasks = loadFromStorage("todoTasks", []);
-  const projects = loadFromStorage("dashboardEntries", []);
-  const hobbiesData = loadFromStorage("hobbyTracker", { hobbies: [] });
-  const hobbies = Array.isArray(hobbiesData && hobbiesData.hobbies) ? hobbiesData.hobbies : [];
+const DASHBOARD_CALENDAR_LAYOUT_KEY = "dashboardCalendarLayout";
+const DASHBOARD_CALENDAR_DEMO_SEED_KEY = "dashboardCalendarDemoSeeded";
+const DASHBOARD_CALENDAR_CARD_W = 220;
+const DASHBOARD_CALENDAR_CARD_H = 118;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const horizonDays = 7;
-  const upcoming = [];
+function readTaskDueParts(dueValue) {
+  if (!dueValue || typeof dueValue !== "string") return { date: "", time: "" };
+  const dateOnlyMatch = dueValue.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if (dateOnlyMatch) return { date: dateOnlyMatch[1], time: "" };
+  const dateTimeMatch = dueValue.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/);
+  if (dateTimeMatch) return { date: dateTimeMatch[1], time: dateTimeMatch[2] };
+  const parsed = parseDate(dueValue);
+  if (!parsed) return { date: "", time: "" };
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  const hh = String(parsed.getHours()).padStart(2, "0");
+  const min = String(parsed.getMinutes()).padStart(2, "0");
+  return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${min}` };
+}
 
-  if (Array.isArray(tasks)) {
-    tasks.forEach((task) => {
-      if (!task || !task.due) return;
-      const dueDate = parseDate(task.due);
-      if (!dueDate || dueDate < today) return;
-      upcoming.push({
-        title: task.title || "Task",
-        type: "Task",
-        date: dueDate,
-        timed: true,
-      });
+function loadCalendarLayout() {
+  const raw = loadFromStorage(DASHBOARD_CALENDAR_LAYOUT_KEY, {});
+  return raw && typeof raw === "object" ? raw : {};
+}
+
+function saveCalendarLayout(layout) {
+  saveToStorage(DASHBOARD_CALENDAR_LAYOUT_KEY, layout || {});
+}
+
+function updateTaskDueFromInputs(task, dateValue, timeValue) {
+  if (!task) return;
+  const date = String(dateValue || "").trim();
+  const time = String(timeValue || "").trim();
+  if (!date) {
+    delete task.due;
+    return;
+  }
+  task.due = time ? `${date}T${time}` : date;
+}
+
+function makeDefaultCardPosition(index) {
+  const cols = 3;
+  const col = index % cols;
+  const row = Math.floor(index / cols);
+  return { x: col * (DASHBOARD_CALENDAR_CARD_W + 12), y: row * (DASHBOARD_CALENDAR_CARD_H + 12) };
+}
+
+function clampCardPosition(pos, canvas) {
+  const width = Math.max(280, canvas.clientWidth || 280);
+  const height = Math.max(320, canvas.clientHeight || 320);
+  const maxX = Math.max(0, width - DASHBOARD_CALENDAR_CARD_W);
+  const maxY = Math.max(0, height - DASHBOARD_CALENDAR_CARD_H);
+  const x = Math.min(Math.max(0, Math.round(Number(pos?.x) || 0)), maxX);
+  const y = Math.min(Math.max(0, Math.round(Number(pos?.y) || 0)), maxY);
+  return { x, y };
+}
+
+function blockCalendarTileNavigation(target) {
+  const tile = target.closest(".link-tile.calendar");
+  if (!tile || tile.dataset.calendarDragReady === "1") return;
+  tile.dataset.calendarDragReady = "1";
+  tile.addEventListener("click", (event) => {
+    const el = event.target;
+    if (!(el instanceof HTMLElement)) return;
+    if (el.closest(".calendar-dash")) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  });
+}
+
+function seedDashboardCalendarDemoDataIfNeeded() {
+  if (typeof window === "undefined" || window.location.protocol !== "file:") return;
+  const alreadySeeded = loadFromStorage(DASHBOARD_CALENDAR_DEMO_SEED_KEY, false);
+  const existingTasks = loadFromStorage("todoTasks", []);
+  const tasks = Array.isArray(existingTasks) ? [...existingTasks] : [];
+  const layout = loadCalendarLayout();
+  let changed = false;
+
+  const requiredSampleId = "demo-wifi-dcm-omi-4x4-fr";
+  const hasRequiredSample = tasks.some((task) => String(task && task.id) === requiredSampleId);
+
+  if (!hasRequiredSample) {
+    tasks.unshift({
+      id: requiredSampleId,
+      title: "Wifi - DCM, OMI in detail with 4x4 FR",
+      priority: "P1",
+      due: "2026-02-16T10:30",
+      notes: "Sample task for dashboard drag/drop validation",
+      tags: ["wifi", "sample"],
+      linkedItems: [],
+      done: false,
+      createdAt: new Date().toISOString(),
     });
+    layout[requiredSampleId] = layout[requiredSampleId] || { x: 0, y: 0 };
+    changed = true;
   }
 
-  const addWeekly = (item, label, scheduleDays, startDate, endDate) => {
-    if (!Array.isArray(scheduleDays)) return;
-    for (let offset = 0; offset < horizonDays; offset += 1) {
-      const day = new Date(today);
-      day.setDate(today.getDate() + offset);
-      if (!isWithinDateRange(day, startDate, endDate)) continue;
-      if (!scheduleDays.includes(dayIndex(day))) continue;
-      const date = new Date(day);
-      date.setHours(9, 0, 0, 0);
-      upcoming.push({
-        title: item,
-        type: label,
-        date,
-        timed: false,
-      });
+  if (alreadySeeded) {
+    if (changed) {
+      saveToStorage("todoTasks", tasks);
+      saveToStorage(DASHBOARD_CALENDAR_LAYOUT_KEY, layout);
     }
+    return;
+  }
+
+  const demoTasks = [
+    {
+      id: "demo-task-1",
+      title: "Wifi - DCM, OMI in detail with 4x4 FR",
+      priority: "P1",
+      due: "2026-02-16T09:30",
+      notes: "",
+      tags: ["demo"],
+      linkedItems: [],
+      done: false,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "demo-task-2",
+      title: "Calendar drag QA",
+      priority: "P2",
+      due: "2026-02-16T14:00",
+      notes: "",
+      tags: ["demo"],
+      linkedItems: [],
+      done: false,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "demo-task-3",
+      title: "Prepare release note",
+      priority: "P3",
+      due: "2026-02-17",
+      notes: "",
+      tags: ["demo"],
+      linkedItems: [],
+      done: false,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: "demo-task-4",
+      title: "Backlog grooming",
+      priority: "P4",
+      notes: "",
+      tags: ["demo"],
+      linkedItems: [],
+      done: false,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  const demoLayout = {
+    "demo-task-1": { x: 0, y: 0 },
+    "demo-task-2": { x: 232, y: 0 },
+    "demo-task-3": { x: 0, y: 132 },
+    "demo-task-4": { x: 232, y: 132 },
   };
 
-  if (Array.isArray(projects)) {
-    projects.forEach((entry) => {
-      addWeekly(
-        entry.title || "Project",
-        entry.type || "Project",
-        entry.scheduleDays,
-        entry.startDate,
-        entry.endDate
-      );
-    });
+  if (!tasks.length) {
+    saveToStorage("todoTasks", demoTasks);
+    saveToStorage(DASHBOARD_CALENDAR_LAYOUT_KEY, demoLayout);
+  } else {
+    saveToStorage("todoTasks", tasks);
+    saveToStorage(DASHBOARD_CALENDAR_LAYOUT_KEY, layout);
+  }
+  saveToStorage(DASHBOARD_CALENDAR_DEMO_SEED_KEY, true);
+}
+
+function renderCalendarPreview(target) {
+  seedDashboardCalendarDemoDataIfNeeded();
+  blockCalendarTileNavigation(target);
+  const tasks = loadFromStorage("todoTasks", []);
+  const activeTasks = Array.isArray(tasks) ? tasks.filter((task) => task && !task.done) : [];
+
+  target.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "calendar-dash";
+  wrap.innerHTML = `
+    <div class="calendar-dash-meta">Drag tasks anywhere in this board, then set date/time inline.</div>
+    <div class="calendar-dash-board"></div>
+  `;
+  target.appendChild(wrap);
+
+  const board = wrap.querySelector(".calendar-dash-board");
+  if (!board || !activeTasks.length) {
+    const empty = document.createElement("div");
+    empty.className = "preview-empty";
+    empty.textContent = "No active tasks. Add tasks in To-Do to schedule here.";
+    target.appendChild(empty);
+    return;
   }
 
-  hobbies.forEach((hobby) => {
-    addWeekly(hobby.name || "Hobby", "Hobby", hobby.scheduleDays, null, null);
+  const taskMap = new Map(activeTasks.map((task) => [String(task.id), task]));
+  const layout = loadCalendarLayout();
+  let currentZ = 1;
+
+  const persistTaskUpdates = () => {
+    const next = Array.isArray(tasks) ? tasks : [];
+    saveToStorage("todoTasks", next);
+    renderAllPreviews();
+  };
+
+  activeTasks.slice(0, 12).forEach((task, index) => {
+    const id = String(task.id || "");
+    if (!id) return;
+    const dueParts = readTaskDueParts(task.due);
+    const pos = clampCardPosition(layout[id] || makeDefaultCardPosition(index), board);
+    layout[id] = pos;
+
+    const card = document.createElement("article");
+    card.className = "calendar-task-card";
+    card.dataset.taskId = id;
+    card.style.left = `${pos.x}px`;
+    card.style.top = `${pos.y}px`;
+    card.style.zIndex = String(currentZ++);
+    card.innerHTML = `
+      <div class="calendar-task-head">
+        <span class="calendar-task-title">${task.title || "Untitled task"}</span>
+      </div>
+      <div class="calendar-task-row">
+        <label>Date</label>
+        <input type="date" value="${dueParts.date}" />
+      </div>
+      <div class="calendar-task-row">
+        <label>Time</label>
+        <input type="time" value="${dueParts.time}" />
+        <button type="button" class="calendar-clear-time">Clear</button>
+      </div>
+    `;
+    board.appendChild(card);
+
+    const dateInput = card.querySelector("input[type='date']");
+    const timeInput = card.querySelector("input[type='time']");
+    const clearBtn = card.querySelector(".calendar-clear-time");
+
+    const applyDueFromInputs = () => {
+      const liveTask = taskMap.get(id);
+      if (!liveTask || !dateInput || !timeInput) return;
+      updateTaskDueFromInputs(liveTask, dateInput.value, timeInput.value);
+      persistTaskUpdates();
+    };
+
+    if (dateInput) dateInput.addEventListener("change", applyDueFromInputs);
+    if (timeInput) timeInput.addEventListener("change", applyDueFromInputs);
+    if (clearBtn) {
+      clearBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (timeInput) timeInput.value = "";
+        applyDueFromInputs();
+      });
+    }
+
+    const startCardDrag = (startClientX, startClientY) => {
+      const startLeft = Number.parseFloat(card.style.left || "0");
+      const startTop = Number.parseFloat(card.style.top || "0");
+      card.style.zIndex = String(currentZ++);
+
+      const onMove = (clientX, clientY) => {
+        const nextPos = clampCardPosition(
+          {
+            x: startLeft + (clientX - startClientX),
+            y: startTop + (clientY - startClientY),
+          },
+          board
+        );
+        card.style.left = `${nextPos.x}px`;
+        card.style.top = `${nextPos.y}px`;
+      };
+
+      const onEnd = () => {
+        const endPos = clampCardPosition(
+          {
+            x: Number.parseFloat(card.style.left || "0"),
+            y: Number.parseFloat(card.style.top || "0"),
+          },
+          board
+        );
+        layout[id] = endPos;
+        saveCalendarLayout(layout);
+      };
+
+      return { onMove, onEnd };
+    };
+
+    card.addEventListener("pointerdown", (event) => {
+      const targetEl = event.target;
+      if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
+      event.preventDefault();
+      const drag = startCardDrag(event.clientX, event.clientY);
+      const pointerId = event.pointerId;
+      if (typeof card.setPointerCapture === "function") {
+        try {
+          card.setPointerCapture(pointerId);
+        } catch (_) {}
+      }
+
+      const onPointerMove = (moveEvent) => drag.onMove(moveEvent.clientX, moveEvent.clientY);
+      const onPointerEnd = () => {
+        card.removeEventListener("pointermove", onPointerMove);
+        card.removeEventListener("pointerup", onPointerEnd);
+        card.removeEventListener("pointercancel", onPointerEnd);
+        drag.onEnd();
+      };
+
+      card.addEventListener("pointermove", onPointerMove);
+      card.addEventListener("pointerup", onPointerEnd);
+      card.addEventListener("pointercancel", onPointerEnd);
+    });
+
+    card.addEventListener("mousedown", (event) => {
+      const targetEl = event.target;
+      if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const drag = startCardDrag(event.clientX, event.clientY);
+
+      const onMouseMove = (moveEvent) => drag.onMove(moveEvent.clientX, moveEvent.clientY);
+      const onMouseUp = () => {
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+        drag.onEnd();
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    });
+
+    card.addEventListener(
+      "touchstart",
+      (event) => {
+        const targetEl = event.target;
+        if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
+        const touch = event.touches && event.touches[0];
+        if (!touch) return;
+        event.preventDefault();
+        const drag = startCardDrag(touch.clientX, touch.clientY);
+
+        const onTouchMove = (moveEvent) => {
+          const nextTouch = moveEvent.touches && moveEvent.touches[0];
+          if (!nextTouch) return;
+          drag.onMove(nextTouch.clientX, nextTouch.clientY);
+          moveEvent.preventDefault();
+        };
+        const onTouchEnd = () => {
+          window.removeEventListener("touchmove", onTouchMove);
+          window.removeEventListener("touchend", onTouchEnd);
+          window.removeEventListener("touchcancel", onTouchEnd);
+          drag.onEnd();
+        };
+
+        window.addEventListener("touchmove", onTouchMove, { passive: false });
+        window.addEventListener("touchend", onTouchEnd);
+        window.addEventListener("touchcancel", onTouchEnd);
+      },
+      { passive: false }
+    );
   });
 
-  const sorted = upcoming.sort((a, b) => a.date - b.date);
-  const items = sorted.slice(0, PREVIEW_LIMIT).map((item) =>
-    createPreviewItem({
-      title: item.title,
-      pill: item.type,
-      pillClass: String(item.type).toLowerCase(),
-      meta: formatShortDate(item.date, item.timed),
-    })
-  );
-  renderPreviewList(target, items, "No upcoming items scheduled.");
+  saveCalendarLayout(layout);
 }
 
 function renderSyncPreview(target) {
-  const lastBackup = localStorage.getItem("localLastSnapshot");
+  const lastBackup = loadFromStorage("localLastSnapshot", null);
   const items = [
     createPreviewItem({
       title: "Local backup",
@@ -440,21 +769,41 @@ function renderSyncPreview(target) {
 
 function renderAllPreviews() {
   previewTargets.forEach((target) => {
-    const type = target.dataset.preview;
-    if (type === "todo") return renderTodoPreview(target);
-    if (type === "projects") return renderProjectsPreview(target);
-    if (type === "hobbies") return renderHobbiesPreview(target);
-    if (type === "journal") return renderJournalPreview(target);
-    if (type === "calendar") return renderCalendarPreview(target);
-    if (type === "links") return renderLinksPreview(target);
-    if (type === "pomodoro") return renderPomodoroPreview(target);
-    if (type === "sync") return renderSyncPreview(target);
+    try {
+      const type = target.dataset.preview;
+      if (type === "todo") return renderTodoPreview(target);
+      if (type === "projects") return renderProjectsPreview(target);
+      if (type === "hobbies") return renderHobbiesPreview(target);
+      if (type === "journal") return renderJournalPreview(target);
+      if (type === "calendar") return renderCalendarPreview(target);
+      if (type === "links") return renderLinksPreview(target);
+      if (type === "pomodoro") return renderPomodoroPreview(target);
+      if (type === "sync") return renderSyncPreview(target);
+    } catch (err) {
+      target.innerHTML = "";
+      const fallback = document.createElement("div");
+      fallback.className = "preview-empty";
+      fallback.textContent = "Preview unavailable in this browser mode.";
+      target.appendChild(fallback);
+    }
   });
 }
 
 function initPreviews() {
+  seedDashboardCalendarDemoDataIfNeeded();
+  if (typeof window !== "undefined") {
+    const protocol = String((window.location && window.location.protocol) || "").toLowerCase();
+    if (protocol === "file:") {
+      renderAllPreviews();
+      return;
+    }
+  }
   if (typeof initStorage === "function") {
-    initStorage().then(renderAllPreviews);
+    initStorage()
+      .then(renderAllPreviews)
+      .catch(() => {
+        renderAllPreviews();
+      });
   } else {
     renderAllPreviews();
   }

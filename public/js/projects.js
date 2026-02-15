@@ -8,6 +8,7 @@ const notesInput = document.getElementById("entryNotes");
 const tagsInput = document.getElementById("entryTags");
 const suggestions = document.getElementById("entrySuggestions");
 const linkedItems = document.getElementById("entryLinkedItems");
+const submitBtn = document.getElementById("entrySubmitBtn");
 const entriesList = document.getElementById("entriesList");
 const ganttCanvas = document.getElementById("ganttCanvas");
 const ganttWrap = document.getElementById("ganttWrap");
@@ -27,6 +28,7 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 let entries = [];
 let ganttZoom = loadGanttZoom();
 let editingId = null;
+let formEditingId = null;
 let linkItems = [];
 let currentLinks = [];
 let formOpen = false;
@@ -752,32 +754,90 @@ function renderEntries() {
   renderGantt();
 }
 
+function resetFormState() {
+  formEditingId = null;
+  if (submitBtn) submitBtn.textContent = "Add entry";
+}
+
+function populateFormForEdit(entry) {
+  if (!entry) return;
+  formEditingId = entry.id;
+  typeInput.value = entry.type || "Project";
+  titleInput.value = entry.title || "";
+  startInput.value = entry.startDate || "";
+  endInput.value = entry.endDate || "";
+  linksInput.value = entry.links || "";
+  notesInput.value = entry.notes || "";
+  tagsInput.value = Array.isArray(entry.tags) ? entry.tags.join(", ") : "";
+  currentLinks = Array.isArray(entry.linkedItems) ? [...entry.linkedItems] : [];
+  renderFormLinkedItems();
+  if (submitBtn) submitBtn.textContent = "Update entry";
+  setFormOpen(true);
+  titleInput.focus();
+}
+
 function addEntry(event) {
   event.preventDefault();
-  const entry = {
-    id: generateId(),
+  const title = titleInput.value.trim();
+  const startDate = startInput.value;
+  if (!title || !startDate) return;
+
+  const updates = {
     type: typeInput.value,
-    title: titleInput.value.trim(),
-    startDate: startInput.value,
+    title,
+    startDate,
     endDate: endInput.value,
     links: linksInput.value.trim(),
     notes: notesInput.value.trim(),
     tags: parseTags(tagsInput.value),
     linkedItems: [...currentLinks],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    history: [],
-    workSegments: [],
-    scheduleDays: [],
   };
 
-  if (!entry.title || !entry.startDate) return;
-  entries.unshift(entry);
-  trackChanges(entry, { title: entry.title, notes: entry.notes, startDate: entry.startDate, endDate: entry.endDate });
+  if (formEditingId) {
+    const existing = entries.find((item) => item.id === formEditingId);
+    if (existing) {
+      trackChanges(existing, updates);
+      existing.type = updates.type;
+      existing.title = updates.title;
+      existing.startDate = updates.startDate;
+      existing.endDate = updates.endDate;
+      existing.links = updates.links;
+      existing.notes = updates.notes;
+      existing.tags = updates.tags;
+      existing.linkedItems = updates.linkedItems;
+      existing.updatedAt = new Date().toISOString();
+    }
+  } else {
+    const entry = {
+      id: generateId(),
+      type: updates.type,
+      title: updates.title,
+      startDate: updates.startDate,
+      endDate: updates.endDate,
+      links: updates.links,
+      notes: updates.notes,
+      tags: updates.tags,
+      linkedItems: updates.linkedItems,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      history: [],
+      workSegments: [],
+      scheduleDays: [],
+    };
+    entries.unshift(entry);
+    trackChanges(entry, {
+      title: entry.title,
+      notes: entry.notes,
+      startDate: entry.startDate,
+      endDate: entry.endDate,
+    });
+  }
+
   saveEntries();
   renderEntries();
   form.reset();
   typeInput.value = "Project";
+  resetFormState();
   currentLinks = [];
   renderFormLinkedItems();
   setFormOpen(false);
@@ -785,6 +845,13 @@ function addEntry(event) {
 
 function deleteEntry(id) {
   entries = entries.filter((entry) => entry.id !== id);
+  if (formEditingId === id) {
+    form.reset();
+    typeInput.value = "Project";
+    currentLinks = [];
+    renderFormLinkedItems();
+    resetFormState();
+  }
   saveEntries();
   renderEntries();
 }
@@ -805,8 +872,9 @@ entriesList.addEventListener("click", (event) => {
   if (target.matches("button[data-edit]")) {
     const entryId = target.dataset.edit;
     editingId = editingId === entryId ? null : entryId;
+    const entry = entries.find((item) => item.id === entryId);
+    if (entry) populateFormForEdit(entry);
     renderEntries();
-    setFormOpen(true);
     return;
   }
   const header = target.closest(".entry-header");

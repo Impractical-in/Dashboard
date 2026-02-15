@@ -2,7 +2,9 @@
 
 A lightweight personal dashboard to track tasks, projects, journaling, habits, and focus sessions.
 
-## Features
+## Versions
+- Dashboard app: `v0.2.0`
+- Local agent chat: `v0.1``r`n`r`n## Features
 - Home overview with quick access
 - To-do list with priorities and due dates
 - Projects + learning tracker
@@ -59,3 +61,5 @@ The launcher will:
 - start/verify Ollama,
 - start dashboard server,
 - print local + LAN URLs.
+
+

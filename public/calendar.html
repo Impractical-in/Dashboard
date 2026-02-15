@@ -12,14 +12,17 @@
         <div class="title">Calendar</div>
         <div class="subtitle">Scheduled tasks, projects, and hobbies</div>
       </div>
-      <a class="btn ghost" href="index.html">Back to Home</a>
+      <div class="topbar-actions">
+        <button class="btn help-btn" id="helpToggleBtn" type="button" aria-haspopup="dialog" aria-controls="shortcutsPanel">?</button>
+        <a class="btn ghost" href="index.html">Back to Home</a>
+      </div>
     </header>
 
     <main class="card">
       <div class="calendar-head">
-        <button class="btn" id="prevPeriod" type="button">◀</button>
+        <button class="btn" id="prevPeriod" type="button">Prev</button>
         <div id="monthLabel" class="month-label"></div>
-        <button class="btn" id="nextPeriod" type="button">▶</button>
+        <button class="btn" id="nextPeriod" type="button">Next</button>
         <div class="view-toggle">
           <button class="btn" id="monthViewBtn" type="button">Month</button>
           <button class="btn" id="weekViewBtn" type="button">Week</button>
@@ -34,6 +37,55 @@
         <span>Sat</span>
         <span>Sun</span>
       </div>
+      <section class="quick-add card-lite" aria-label="Quick add tasks">
+        <div class="quick-add-head">
+          <div class="section-title">Quick Add</div>
+          <div class="detail-meta">Create a task, project, or learning plan directly from calendar.</div>
+        </div>
+        <form id="quickAddForm" class="quick-add-form">
+          <select id="quickEntryType">
+            <option value="Task" selected>Task</option>
+            <option value="Project">Project</option>
+            <option value="Learning">Learning</option>
+          </select>
+          <input id="quickTaskTitle" type="text" placeholder="Title" required />
+          <input id="quickTaskDate" type="date" required />
+          <input id="quickTaskTime" type="time" data-quick-task-only="1" />
+          <select id="quickTaskDuration" data-quick-task-only="1">
+            <option value="30">30m</option>
+            <option value="45">45m</option>
+            <option value="60" selected>60m</option>
+            <option value="90">90m</option>
+            <option value="120">120m</option>
+          </select>
+          <select id="quickTaskPriority" data-quick-task-only="1">
+            <option value="P1">P1</option>
+            <option value="P2" selected>P2</option>
+            <option value="P3">P3</option>
+            <option value="P4">P4</option>
+          </select>
+          <label class="quick-inline" for="quickTaskColor" data-quick-task-only="1">Color</label>
+          <input id="quickTaskColor" type="color" value="#c84632" data-quick-task-only="1" />
+          <label class="quick-inline">
+            <input id="quickTaskSeriesToggle" type="checkbox" />
+            Repeat / Series
+          </label>
+          <div id="quickSeriesFields" class="quick-series hidden">
+            <label class="quick-inline" for="quickSeriesEndDate">Until</label>
+            <input id="quickSeriesEndDate" type="date" />
+            <div class="quick-days" id="quickSeriesDays">
+              <label><input type="checkbox" value="0" />Mon</label>
+              <label><input type="checkbox" value="1" />Tue</label>
+              <label><input type="checkbox" value="2" />Wed</label>
+              <label><input type="checkbox" value="3" />Thu</label>
+              <label><input type="checkbox" value="4" />Fri</label>
+              <label><input type="checkbox" value="5" />Sat</label>
+              <label><input type="checkbox" value="6" />Sun</label>
+            </div>
+          </div>
+          <button class="btn" id="quickAddSubmit" type="submit">Add</button>
+        </form>
+      </section>
       <div id="calendarGrid" class="calendar-grid"></div>
       <div id="weekView" class="week-view hidden"></div>
     </main>
@@ -43,9 +95,27 @@
       <div id="dayDetails" class="day-details"></div>
     </section>
 
-    <script src="js/storage.js"></script>
-    <script src="js/calendar.js"></script>
-      <script src="js/agent-chat.js"></script>
+    <div id="shortcutsPanel" class="shortcuts-panel hidden" role="dialog" aria-modal="true" aria-label="Calendar shortcuts">
+      <div class="shortcuts-card">
+        <div class="shortcuts-head">
+          <div class="section-title">Calendar Shortcuts</div>
+          <button id="shortcutsCloseBtn" class="btn" type="button">Close</button>
+        </div>
+        <div class="shortcuts-list">
+          <div><strong>Drag</strong>: move task to another day/time slot.</div>
+          <div><strong>Resize bottom edge</strong>: increase/decrease task duration.</div>
+          <div><strong>Alt/Ctrl + Drop</strong>: copy task to target day/time.</div>
+          <div><strong>Double-click</strong>: open origin task in To-Do.</div>
+          <div><strong>Shift + Double-click</strong>: span task across multiple days (linked series).</div>
+          <div><strong>Right-click</strong>: delete one occurrence or entire linked series.</div>
+          <div><strong>Linked series</strong>: moving/resizing one occurrence updates all in series.</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="js/storage.js?v=0.2.2"></script>
+    <script src="js/calendar.js?v=20260215-local-v21"></script>
+    <script src="js/agent-chat.js"></script>
   </body>
 </html>
 

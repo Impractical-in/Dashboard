@@ -104,6 +104,7 @@ function render() {
   data.hobbies.forEach((hobby) => {
     const card = document.createElement("div");
     card.className = `hobby-card ${isCompletedToday(hobby) ? "active" : ""}`;
+    card.dataset.id = hobby.id;
     const dayLabels = ["M", "T", "W", "TH", "F", "Sa", "Su"];
     const scheduleButtons = dayLabels
       .map((label, index) => {
@@ -157,6 +158,15 @@ function render() {
 
     hobbyGrid.appendChild(card);
   });
+}
+
+function focusHobbyFromQuery() {
+  const focusId = new URLSearchParams(window.location.search).get("focus");
+  if (!focusId) return;
+  const card = hobbyGrid.querySelector(`[data-id="${focusId}"]`);
+  if (!card) return;
+  card.classList.add("focused");
+  card.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 function addHobby(event) {
@@ -270,4 +280,5 @@ initStorage().then(() => {
   normalizeData();
   hobbyDeleteBtn.classList.add("hidden");
   render();
+  focusHobbyFromQuery();
 });

@@ -1,0 +1,23 @@
+:root {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100vh;
+}
+
+button,
+.btn,
+a.btn,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.card,
+section,
+header,
+main {
+  box-sizing: border-box;
+}
