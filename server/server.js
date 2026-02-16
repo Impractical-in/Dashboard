@@ -25,6 +25,7 @@ const AGENT_PROMPT_CONTEXT_LIMIT = Math.max(
 );
 const AGENT_MAX_PREDICT = Math.max(32, Number(process.env.DASHBOARD_AGENT_MAX_PREDICT || 160));
 const AGENT_KEEP_ALIVE = process.env.DASHBOARD_AGENT_KEEP_ALIVE || "30m";
+const AGENT_RETRIEVAL_ITEM_LIMIT = Math.max(5, Number(process.env.DASHBOARD_AGENT_RETRIEVAL_ITEM_LIMIT || 20));
 
 function getOllamaBases() {
   const bases = [
@@ -415,10 +416,150 @@ function saveUserProfileEnvelope(envelope) {
   return payload;
 }
 
-function buildAgentContextForQuestion() {
+function toEpochMs(value) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+}
+
+function priorityRank(value) {
+  const key = String(value || "").toUpperCase();
+  if (key === "P0") return 0;
+  if (key === "P1") return 1;
+  if (key === "P2") return 2;
+  if (key === "P3") return 3;
+  return 9;
+}
+
+function detectIntent(question) {
+  const q = String(question || "").toLowerCase();
+  if (/\b(calendar|week|day|schedule|event|meeting)\b/.test(q)) return "calendar";
+  if (/\b(project|learning|milestone|roadmap)\b/.test(q)) return "projects";
+  if (/\b(task|todo|pending|due|overdue|priority)\b/.test(q)) return "tasks";
+  if (/\b(habit|streak)\b/.test(q)) return "habits";
+  if (/\b(journal|note)\b/.test(q)) return "journal";
+  return "general";
+}
+
+function pickArray(stateData, keys) {
+  const state = toObject(stateData);
+  for (let i = 0; i < keys.length; i += 1) {
+    const value = state[keys[i]];
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function mapTaskForAgent(task) {
+  const t = toObject(task);
+  return {
+    id: t.id || "",
+    title: t.title || "",
+    due: t.due || "",
+    priority: t.priority || "",
+    done: Boolean(t.done),
+    tags: Array.isArray(t.tags) ? t.tags.slice(0, 6) : [],
+  };
+}
+
+function getTaskSlice(stateData, intent) {
+  const tasks = pickArray(stateData, ["todoTasks", "tasks"]).map(mapTaskForAgent);
+  const pending = tasks.filter((t) => !t.done);
+  pending.sort((a, b) => {
+    const dueDelta = toEpochMs(a.due) - toEpochMs(b.due);
+    if (dueDelta !== 0) return dueDelta;
+    return priorityRank(a.priority) - priorityRank(b.priority);
+  });
+  const done = tasks.filter((t) => t.done).slice(0, Math.min(6, AGENT_RETRIEVAL_ITEM_LIMIT));
+  const limit = intent === "tasks" ? AGENT_RETRIEVAL_ITEM_LIMIT : Math.min(8, AGENT_RETRIEVAL_ITEM_LIMIT);
+  return {
+    pending: pending.slice(0, limit),
+    doneRecent: done,
+    totalTasks: tasks.length,
+    pendingCount: pending.length,
+  };
+}
+
+function mapCalendarItem(item) {
+  const e = toObject(item);
+  return {
+    id: e.id || "",
+    title: e.title || e.name || "",
+    start: e.start || e.startDate || e.date || "",
+    end: e.end || e.endDate || "",
+    due: e.due || "",
+    type: e.type || "",
+  };
+}
+
+function getCalendarSlice(stateData, intent) {
+  const events = pickArray(stateData, ["calendarItems", "calendarEntries", "calendarTasks", "weekItems"])
+    .map(mapCalendarItem);
+  events.sort((a, b) => toEpochMs(a.start || a.due) - toEpochMs(b.start || b.due));
+  const limit = intent === "calendar" ? AGENT_RETRIEVAL_ITEM_LIMIT : Math.min(8, AGENT_RETRIEVAL_ITEM_LIMIT);
+  return {
+    upcoming: events.slice(0, limit),
+    totalEvents: events.length,
+  };
+}
+
+function mapProjectForAgent(item) {
+  const p = toObject(item);
+  return {
+    id: p.id || "",
+    type: p.type || "",
+    title: p.title || "",
+    startDate: p.startDate || "",
+    endDate: p.endDate || "",
+    tags: Array.isArray(p.tags) ? p.tags.slice(0, 6) : [],
+  };
+}
+
+function getProjectSlice(stateData, intent) {
+  const entries = pickArray(stateData, ["dashboardEntries", "projects"]).map(mapProjectForAgent);
+  const active = entries.filter((p) => String(p.type || "").toLowerCase() === "project" || String(p.type || "").toLowerCase() === "learning");
+  active.sort((a, b) => toEpochMs(a.endDate) - toEpochMs(b.endDate));
+  const limit = intent === "projects" ? Math.min(12, AGENT_RETRIEVAL_ITEM_LIMIT) : Math.min(6, AGENT_RETRIEVAL_ITEM_LIMIT);
+  return {
+    active: active.slice(0, limit),
+    totalEntries: entries.length,
+  };
+}
+
+function getHabitSlice(stateData) {
+  const habits = pickArray(stateData, ["hobbyTracker", "habits"]).map((h) => toObject(h));
+  return {
+    top: habits.slice(0, Math.min(10, AGENT_RETRIEVAL_ITEM_LIMIT)),
+    total: habits.length,
+  };
+}
+
+function getJournalSlice(stateData) {
+  const journal = pickArray(stateData, ["journalEntries"]).map((j) => toObject(j));
+  return {
+    recent: journal.slice(0, Math.min(8, AGENT_RETRIEVAL_ITEM_LIMIT)),
+    total: journal.length,
+  };
+}
+
+function buildRelevantSlices(stateData, intent) {
+  if (intent === "tasks") return { tasks: getTaskSlice(stateData, intent) };
+  if (intent === "calendar") return { calendar: getCalendarSlice(stateData, intent) };
+  if (intent === "projects") return { projects: getProjectSlice(stateData, intent) };
+  if (intent === "habits") return { habits: getHabitSlice(stateData) };
+  if (intent === "journal") return { journal: getJournalSlice(stateData) };
+  return {
+    tasks: getTaskSlice(stateData, intent),
+    calendar: getCalendarSlice(stateData, intent),
+    projects: getProjectSlice(stateData, intent),
+  };
+}
+
+function buildAgentContextForQuestion(question) {
   const currentState = loadServerState();
   const backup = loadLatestBackupState();
   const stateData = Object.keys(currentState).length ? currentState : toObject(backup.data);
+  const intent = detectIntent(question);
 
   const existingProfileEnvelope = loadUserProfileEnvelope();
   const derivedProfile = deriveProfileFromState(stateData);
@@ -434,6 +575,7 @@ function buildAgentContextForQuestion() {
     const value = stateData[key];
     if (Array.isArray(value)) sectionCounts[key] = value.length;
   });
+  const relevant = buildRelevantSlices(stateData, intent);
 
   return sanitizeForAgent({
     generatedAt: new Date().toISOString(),
@@ -446,9 +588,10 @@ function buildAgentContextForQuestion() {
         ? `${backup.source}:${backup.name}`
         : "none",
     stateUpdatedAt: backup.updatedAt || null,
+    intent,
     stateKeys,
     sectionCounts,
-    stateData,
+    relevant,
   });
 }
 
@@ -584,7 +727,7 @@ const server = http.createServer(async (req, res) => {
       const payload = raw ? JSON.parse(raw) : {};
       const question = String(payload.question || "").trim();
       if (!question) return send(res, 400, { error: "missing_question" });
-      const context = buildAgentContextForQuestion();
+      const context = buildAgentContextForQuestion(question);
 
       const systemPrompt =
         "You are a local assistant for a personal dashboard. You have read-only access to dashboard context. " +
