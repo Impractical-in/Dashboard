@@ -1,6 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const versions = require(path.join(__dirname, "..", "public", "js", "version.js"));
 
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -10,7 +11,7 @@ const USER_PROFILE_FILE = path.join(DATA_DIR, "user_name.json");
 const STATE_BACKUP_DIR = path.join(DATA_DIR, "state_backups");
 const STATE_BACKUP_BACKUP_DIR = path.join(DATA_DIR, "backup_backup", "state_backups");
 const AGENT_MODEL = process.env.DASHBOARD_AGENT_MODEL || "llama3.2:3b";
-const AGENT_VERSION = "v0.1";
+const AGENT_VERSION = versions && versions.agent ? String(versions.agent) : "v0.0";
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "";
 const MAX_STATE_BACKUPS = 10;
 const GREAT_DELTA_SIZE_RATIO = 0.2;

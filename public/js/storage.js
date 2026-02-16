@@ -1,7 +1,12 @@
 const STORAGE_DB = "dashboard_store";
 const STORAGE_STORE = "kv";
 const META_KEY = "appMeta";
-const APP_VERSION = "0.2.0";
+const APP_VERSION =
+  typeof window !== "undefined" &&
+  window.DASHBOARD_VERSIONS &&
+  typeof window.DASHBOARD_VERSIONS.dashboard === "string"
+    ? window.DASHBOARD_VERSIONS.dashboard
+    : "0.0.0";
 const SERVER_STATE_ENDPOINT = "/api/state";
 
 let storageReady = false;
@@ -287,4 +292,3 @@ function queueServerPush() {
     pushStateToServer().catch(() => {});
   }, 350);
 }
-

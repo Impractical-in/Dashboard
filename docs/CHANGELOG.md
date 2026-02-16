@@ -1,16 +1,24 @@
 # Changelog
 
-## v0.2.0 (Current)
-- Add calendar Quick Add panel to create one-off tasks and repeating task series directly in Calendar
-- Keep drag/drop, resize, linked-series edits, and origin navigation behavior intact
-- Add calendar custom color in Quick Add for new tasks
-- Set calendar default view to Week
-- Bump dashboard app version to `0.2.0`
-- Keep local agent chat version at `0.1``r`n`r`n## v0.1.15
+## v0.3.0 (Current)
+- Dashboard version bumped to `0.3.0`
+- Agent version bumped to `v0.2`
+- Add Home page **Issue Tracker** box with:
+  - project-specific bug IDs (`BUG-<2-char-project-code>-YYYYMMDD-####`)
+  - quick add with project + severity
+  - status workflow (`open`, `in_progress`, `blocked`, `resolved`)
+  - optional details fields (analysis, repro steps, expected, actual, fix notes)
+  - optional history notes log per issue
+- Agent context retrieval changed to include only required slices from server state to reduce timeouts while retaining state integrity
+
+## v0.1.15
 - Improve local agent reliability with clearer Ollama/model diagnostics in health checks
 - Improve agent chat error messages by returning actual Ollama error details
 - Reduce/trim agent context payload to avoid model failures on very large dashboard state
-- Add one-click server backup restore APIs and UI (`/api/state/backups`, `/api/state/backups/restore`)
+- Add server backup APIs and UI:
+  - list backups: `/api/state/backups`
+  - restore selected backup: `/api/state/backups/restore`
+  - upload backup from browser device: `/api/state/backups/upload`
 - Update dashboard layout so top row is only To-Do + Projects/Learning
 - Rename backup tile and page to **Settings & Backup**
 - Bump app version to `0.1.15`
@@ -69,5 +77,3 @@
 - Tagging + linking across modules
 - Dark theme update and dropdown fixes
 - Home previews and layout refinements
-
-

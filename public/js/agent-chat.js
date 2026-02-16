@@ -23,9 +23,15 @@
 
   const panel = document.createElement("section");
   panel.className = "agent-chat-panel";
+  const defaultAgentVersion =
+    typeof window !== "undefined" &&
+    window.DASHBOARD_VERSIONS &&
+    typeof window.DASHBOARD_VERSIONS.agent === "string"
+      ? window.DASHBOARD_VERSIONS.agent
+      : "v0.0";
   panel.innerHTML = `
     <div class="agent-chat-head">
-      <strong id="agentTitle">Local Agent v0.1</strong>
+      <strong id="agentTitle">Local Agent ${defaultAgentVersion}</strong>
       <button type="button" data-close aria-label="Close">x</button>
     </div>
     <div class="agent-chat-log" id="agentChatLog"></div>
@@ -50,7 +56,7 @@
   const sendBtn = panel.querySelector("#agentChatSend");
   const closeBtn = panel.querySelector("[data-close]");
   let agentBaseUrl = "";
-  let agentVersion = "v0.1";
+  let agentVersion = defaultAgentVersion;
 
   function pushMessage(kind, text) {
     const item = document.createElement("div");

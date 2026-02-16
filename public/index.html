@@ -1,8 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
     <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Local Dashboard</title>
     <link rel="stylesheet" href="css/dashboard.css" />
@@ -36,6 +37,42 @@
           <div class="tile-preview" data-preview="projects"></div>
         </div>
       </a>
+
+      <section class="tile issues top-focus" aria-label="Issue Tracker">
+        <div class="tile-icon">IS</div>
+        <div class="tile-body">
+          <div class="tile-title">Issue Tracker</div>
+          <div class="tile-subtitle">Track bugs by project with stable issue IDs</div>
+          <form class="issue-quick-form" id="issueQuickForm">
+            <input
+              id="issueQuickTitle"
+              type="text"
+              placeholder="What broke? (example: week view empty on reload)"
+              maxlength="140"
+              required
+            />
+            <div class="issue-quick-row">
+              <select id="issueQuickProject" aria-label="Select project"></select>
+              <select id="issueQuickSeverity" aria-label="Select severity">
+                <option value="P1">P1 Critical</option>
+                <option value="P2" selected>P2 High</option>
+                <option value="P3">P3 Medium</option>
+                <option value="P4">P4 Low</option>
+              </select>
+              <button class="btn issue-add-btn" type="submit">Add Issue</button>
+            </div>
+            <div class="issue-quick-row issue-filter-row">
+              <label for="issueQuickFilter">View</label>
+              <select id="issueQuickFilter" aria-label="Issue view filter">
+                <option value="open">Open</option>
+                <option value="active">Open + In Progress</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </form>
+          <div class="tile-preview" data-preview="issues"></div>
+        </div>
+      </section>
 
       <a class="tile link-tile hobbies" href="hobbies.html">
         <div class="tile-icon">HB</div>
@@ -93,19 +130,13 @@
     </main>
     <div id="timePanel" class="time-panel hidden" aria-live="polite"></div>
     <footer class="footer">
-      <span id="appVersion">v0.2.0</span>
-      <span class="footer-divider">�</span>
+      <span id="appVersion">v0.0.0</span>
+      <span class="footer-divider">·</span>
       <a class="footer-link" href="https://impractical.in" target="_blank" rel="noreferrer">impractical.in</a>
     </footer>
-    <script src="js/storage.js?v=0.2.1"></script>
-    <script src="js/dashboard.js?v=0.2.1"></script>
-    <script src="js/agent-chat.js?v=0.2.1"></script>
+    <script src="js/version.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-
-
-
-

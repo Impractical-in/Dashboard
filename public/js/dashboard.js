@@ -89,6 +89,9 @@ updateLocalTime();
 setInterval(updateLocalTime, 1000 * 30);
 
 const PREVIEW_LIMIT = 3;
+const ISSUE_PREVIEW_LIMIT = 5;
+const ISSUE_STORAGE_KEY = "projectIssues";
+const ISSUE_META_KEY = "projectIssueMeta";
 const previewTargets = Array.from(document.querySelectorAll("[data-preview]"));
 const dashboardMemoryStore = {};
 let browserStorageAvailableCache = null;
@@ -255,6 +258,463 @@ function renderProjectsPreview(target) {
     });
   });
   renderPreviewList(target, items, "Add a project or learning entry.");
+}
+
+function issueDateStamp(date) {
+  const d = date instanceof Date ? date : new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}${mm}${dd}`;
+}
+
+function issueStatusLabel(status) {
+  if (status === "in_progress") return "In Progress";
+  if (status === "blocked") return "Blocked";
+  if (status === "resolved") return "Resolved";
+  return "Open";
+}
+
+function issueSeverityRank(level) {
+  const order = { P1: 1, P2: 2, P3: 3, P4: 4 };
+  return order[String(level || "").toUpperCase()] || 9;
+}
+
+function issueStatusRank(status) {
+  const order = { open: 1, in_progress: 2, blocked: 3, resolved: 4 };
+  return order[String(status || "").toLowerCase()] || 9;
+}
+
+function normalizeIssue(issue) {
+  const source = issue && typeof issue === "object" ? issue : {};
+  return {
+    id: String(source.id || ""),
+    title: String(source.title || "").trim(),
+    projectId: String(source.projectId || ""),
+    projectTitle: String(source.projectTitle || "General"),
+    severity: String(source.severity || "P2").toUpperCase(),
+    status: String(source.status || "open").toLowerCase(),
+    createdAt: source.createdAt || new Date().toISOString(),
+    updatedAt: source.updatedAt || source.createdAt || new Date().toISOString(),
+    analysis: String(source.analysis || ""),
+    stepsToReproduce: String(source.stepsToReproduce || ""),
+    expected: String(source.expected || ""),
+    actual: String(source.actual || ""),
+    fixNotes: String(source.fixNotes || ""),
+    history: Array.isArray(source.history)
+      ? source.history
+        .filter((entry) => entry && typeof entry === "object")
+        .map((entry) => ({
+          at: entry.at || new Date().toISOString(),
+          note: String(entry.note || ""),
+        }))
+      : [],
+  };
+}
+
+function loadIssueTrackerState() {
+  const raw = loadFromStorage(ISSUE_STORAGE_KEY, { issues: [] });
+  if (Array.isArray(raw)) {
+    return { issues: raw.map(normalizeIssue) };
+  }
+  const issues = Array.isArray(raw && raw.issues) ? raw.issues.map(normalizeIssue) : [];
+  return { issues };
+}
+
+function saveIssueTrackerState(state) {
+  const payload = {
+    issues: Array.isArray(state && state.issues) ? state.issues.map(normalizeIssue) : [],
+  };
+  saveToStorage(ISSUE_STORAGE_KEY, payload);
+}
+
+function normalizeIssueMeta(meta) {
+  const src = meta && typeof meta === "object" ? meta : {};
+  return {
+    date: String(src.date || ""),
+    seq: Number(src.seq || 0),
+    projectCodes: src.projectCodes && typeof src.projectCodes === "object" ? src.projectCodes : {},
+  };
+}
+
+function readIssueMeta() {
+  return normalizeIssueMeta(loadFromStorage(ISSUE_META_KEY, { date: "", seq: 0, projectCodes: {} }));
+}
+
+function writeIssueMeta(meta) {
+  saveToStorage(ISSUE_META_KEY, normalizeIssueMeta(meta));
+}
+
+function toProjectCodeSeed(projectId, projectTitle) {
+  const title = String(projectTitle || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!title) return "GN";
+  if (title.length === 1) return `${title}X`;
+  return `${title[0]}${title[1]}`;
+}
+
+function ensureUniqueProjectCode(baseCode, projectId, projectCodes) {
+  const cleanBase = String(baseCode || "GN").toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(2, "X").slice(0, 2);
+  const existingForProject = projectCodes[projectId];
+  if (existingForProject) return existingForProject;
+  const used = new Set(Object.values(projectCodes || {}));
+  if (!used.has(cleanBase)) return cleanBase;
+  const suffix = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  for (let i = 0; i < suffix.length; i += 1) {
+    const candidate = `${cleanBase[0]}${suffix[i]}`;
+    if (!used.has(candidate)) return candidate;
+  }
+  return cleanBase;
+}
+
+function projectCodeForIssue(projectId, projectTitle) {
+  const key = String(projectId || "__general__");
+  const meta = readIssueMeta();
+  const nextCodes = { ...meta.projectCodes };
+  if (!nextCodes[key]) {
+    const base = toProjectCodeSeed(projectId, projectTitle);
+    nextCodes[key] = ensureUniqueProjectCode(base, key, nextCodes);
+    writeIssueMeta({ ...meta, projectCodes: nextCodes });
+  }
+  return nextCodes[key];
+}
+
+function nextIssueId(projectId, projectTitle) {
+  const stamp = issueDateStamp(new Date());
+  const meta = readIssueMeta();
+  const seq = meta.date === stamp ? Number(meta.seq || 0) + 1 : 1;
+  const projectCode = projectCodeForIssue(projectId, projectTitle);
+  writeIssueMeta({ ...meta, date: stamp, seq });
+  return `BUG-${projectCode}-${stamp}-${String(seq).padStart(4, "0")}`;
+}
+
+function issueProjectOptions() {
+  const entries = loadFromStorage("dashboardEntries", []);
+  const options = [{ id: "", title: "General / Unassigned" }];
+  if (!Array.isArray(entries)) return options;
+  entries.forEach((entry) => {
+    if (!entry) return;
+    const title = String(entry.title || "").trim();
+    if (!title) return;
+    options.push({
+      id: String(entry.id || ""),
+      title,
+    });
+  });
+  return options;
+}
+
+function populateIssueProjectSelect() {
+  const select = document.getElementById("issueQuickProject");
+  if (!select) return;
+  const previous = select.value;
+  const options = issueProjectOptions();
+  select.innerHTML = "";
+  options.forEach((option) => {
+    const el = document.createElement("option");
+    el.value = option.id;
+    el.textContent = option.title;
+    select.appendChild(el);
+  });
+  if (Array.from(select.options).some((option) => option.value === previous)) {
+    select.value = previous;
+  }
+}
+
+function issueFilterValue() {
+  const select = document.getElementById("issueQuickFilter");
+  return select ? String(select.value || "open") : "open";
+}
+
+function issueMatchesFilter(issue, filter) {
+  if (filter === "all") return true;
+  if (filter === "active") return issue.status === "open" || issue.status === "in_progress";
+  return issue.status === "open";
+}
+
+function updateIssueStatus(issueId, status) {
+  const nextStatus = String(status || "open").toLowerCase();
+  const state = loadIssueTrackerState();
+  let changed = false;
+  state.issues = state.issues.map((issue) => {
+    if (issue.id !== issueId) return issue;
+    if (issue.status === nextStatus) return issue;
+    changed = true;
+    return {
+      ...issue,
+      status: nextStatus,
+      updatedAt: new Date().toISOString(),
+      history: [
+        ...(Array.isArray(issue.history) ? issue.history : []),
+        { at: new Date().toISOString(), note: `Status changed to ${issueStatusLabel(nextStatus)}` },
+      ].slice(-50),
+    };
+  });
+  if (changed) saveIssueTrackerState(state);
+}
+
+function updateIssueDetails(issueId, fields) {
+  const updates = fields && typeof fields === "object" ? fields : {};
+  const state = loadIssueTrackerState();
+  let changed = false;
+  state.issues = state.issues.map((issue) => {
+    if (issue.id !== issueId) return issue;
+    changed = true;
+    return normalizeIssue({
+      ...issue,
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
+  });
+  if (changed) saveIssueTrackerState(state);
+}
+
+function appendIssueHistory(issueId, note) {
+  const text = String(note || "").trim();
+  if (!text) return;
+  const state = loadIssueTrackerState();
+  let changed = false;
+  state.issues = state.issues.map((issue) => {
+    if (issue.id !== issueId) return issue;
+    changed = true;
+    return normalizeIssue({
+      ...issue,
+      updatedAt: new Date().toISOString(),
+      history: [
+        ...(Array.isArray(issue.history) ? issue.history : []),
+        { at: new Date().toISOString(), note: text },
+      ].slice(-100),
+    });
+  });
+  if (changed) saveIssueTrackerState(state);
+}
+
+function renderIssuesPreview(target) {
+  populateIssueProjectSelect();
+  const state = loadIssueTrackerState();
+  const filter = issueFilterValue();
+  const filtered = state.issues
+    .filter((issue) => issue && issueMatchesFilter(issue, filter))
+    .sort((a, b) => {
+      const statusDelta = issueStatusRank(a.status) - issueStatusRank(b.status);
+      if (statusDelta !== 0) return statusDelta;
+      const sevDelta = issueSeverityRank(a.severity) - issueSeverityRank(b.severity);
+      if (sevDelta !== 0) return sevDelta;
+      return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
+    });
+
+  target.innerHTML = "";
+  if (!filtered.length) {
+    const empty = document.createElement("div");
+    empty.className = "preview-empty";
+    empty.textContent = "No issues in this view. Add one above.";
+    target.appendChild(empty);
+    return;
+  }
+
+  const list = document.createElement("div");
+  list.className = "preview-list";
+  filtered.slice(0, ISSUE_PREVIEW_LIMIT).forEach((issue) => {
+    const card = document.createElement("div");
+    card.className = "issue-card";
+
+    const head = document.createElement("div");
+    head.className = "issue-head";
+    const idEl = document.createElement("span");
+    idEl.className = "issue-id";
+    idEl.textContent = issue.id;
+    const sevEl = document.createElement("span");
+    sevEl.className = `preview-pill ${String(issue.severity || "P2").toLowerCase()}`;
+    sevEl.textContent = issue.severity || "P2";
+    head.appendChild(idEl);
+    head.appendChild(sevEl);
+
+    const titleEl = document.createElement("div");
+    titleEl.className = "issue-title";
+    titleEl.textContent = issue.title || "Untitled issue";
+
+    const metaEl = document.createElement("div");
+    metaEl.className = "issue-meta";
+    const updated = issue.updatedAt ? formatShortDate(issue.updatedAt, true) : "";
+    metaEl.textContent = `${issue.projectTitle || "General"} • ${issueStatusLabel(issue.status)}${updated ? ` • Updated ${updated}` : ""}`;
+
+    const statusSelect = document.createElement("select");
+    statusSelect.className = "issue-status";
+    [
+      { value: "open", label: "Open" },
+      { value: "in_progress", label: "In Progress" },
+      { value: "blocked", label: "Blocked" },
+      { value: "resolved", label: "Resolved" },
+    ].forEach((option) => {
+      const el = document.createElement("option");
+      el.value = option.value;
+      el.textContent = option.label;
+      statusSelect.appendChild(el);
+    });
+    statusSelect.value = issue.status || "open";
+    statusSelect.addEventListener("change", () => {
+      updateIssueStatus(issue.id, statusSelect.value);
+      renderAllPreviews();
+    });
+
+    const detailsWrap = document.createElement("details");
+    detailsWrap.className = "issue-details";
+    const detailsSummary = document.createElement("summary");
+    detailsSummary.textContent = "Details";
+    detailsWrap.appendChild(detailsSummary);
+
+    const detailsBody = document.createElement("div");
+    detailsBody.className = "issue-details-body";
+
+    function makeField(labelText, key, placeholder) {
+      const wrapper = document.createElement("label");
+      wrapper.className = "issue-detail-field";
+      const label = document.createElement("span");
+      label.textContent = labelText;
+      const area = document.createElement("textarea");
+      area.rows = 2;
+      area.placeholder = placeholder;
+      area.value = String(issue[key] || "");
+      area.dataset.issueKey = key;
+      wrapper.appendChild(label);
+      wrapper.appendChild(area);
+      return { wrapper, area };
+    }
+
+    const analysis = makeField("Analysis (optional)", "analysis", "Why is this happening?");
+    const repro = makeField("Steps To Reproduce (optional)", "stepsToReproduce", "Step 1, Step 2...");
+    const expected = makeField("Expected (optional)", "expected", "Expected behavior");
+    const actual = makeField("Actual (optional)", "actual", "What actually happened");
+    const fixNotes = makeField("Fix Notes (optional)", "fixNotes", "Root cause / fix summary");
+
+    detailsBody.appendChild(analysis.wrapper);
+    detailsBody.appendChild(repro.wrapper);
+    detailsBody.appendChild(expected.wrapper);
+    detailsBody.appendChild(actual.wrapper);
+    detailsBody.appendChild(fixNotes.wrapper);
+
+    const actionsRow = document.createElement("div");
+    actionsRow.className = "issue-detail-actions";
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn";
+    saveBtn.textContent = "Save Details";
+    actionsRow.appendChild(saveBtn);
+    detailsBody.appendChild(actionsRow);
+
+    const historyField = document.createElement("label");
+    historyField.className = "issue-detail-field";
+    const historyTitle = document.createElement("span");
+    historyTitle.textContent = "Add History Note (optional)";
+    const historyInput = document.createElement("input");
+    historyInput.type = "text";
+    historyInput.maxLength = 180;
+    historyInput.placeholder = "Example: Reproduced on mobile Safari";
+    historyField.appendChild(historyTitle);
+    historyField.appendChild(historyInput);
+
+    const historyAddBtn = document.createElement("button");
+    historyAddBtn.type = "button";
+    historyAddBtn.className = "btn";
+    historyAddBtn.textContent = "Add Note";
+
+    const historyList = document.createElement("div");
+    historyList.className = "issue-history-list";
+    const historyItems = Array.isArray(issue.history) ? issue.history.slice(-4).reverse() : [];
+    if (!historyItems.length) {
+      const emptyHistory = document.createElement("div");
+      emptyHistory.className = "preview-empty";
+      emptyHistory.textContent = "No history notes yet.";
+      historyList.appendChild(emptyHistory);
+    } else {
+      historyItems.forEach((entry) => {
+        const row = document.createElement("div");
+        row.className = "issue-history-item";
+        const at = entry.at ? formatShortDate(entry.at, true) : "";
+        row.textContent = `${at ? `${at}: ` : ""}${String(entry.note || "")}`;
+        historyList.appendChild(row);
+      });
+    }
+
+    const historyActions = document.createElement("div");
+    historyActions.className = "issue-detail-actions";
+    historyActions.appendChild(historyAddBtn);
+
+    detailsBody.appendChild(historyField);
+    detailsBody.appendChild(historyActions);
+    detailsBody.appendChild(historyList);
+
+    saveBtn.addEventListener("click", () => {
+      updateIssueDetails(issue.id, {
+        analysis: analysis.area.value.trim(),
+        stepsToReproduce: repro.area.value.trim(),
+        expected: expected.area.value.trim(),
+        actual: actual.area.value.trim(),
+        fixNotes: fixNotes.area.value.trim(),
+      });
+      renderAllPreviews();
+    });
+
+    historyAddBtn.addEventListener("click", () => {
+      const note = historyInput.value.trim();
+      if (!note) return;
+      appendIssueHistory(issue.id, note);
+      renderAllPreviews();
+    });
+
+    detailsWrap.appendChild(detailsBody);
+
+    card.appendChild(head);
+    card.appendChild(titleEl);
+    card.appendChild(metaEl);
+    card.appendChild(statusSelect);
+    card.appendChild(detailsWrap);
+    list.appendChild(card);
+  });
+
+  target.appendChild(list);
+}
+
+function initIssueQuickForm() {
+  const form = document.getElementById("issueQuickForm");
+  const titleInput = document.getElementById("issueQuickTitle");
+  const projectSelect = document.getElementById("issueQuickProject");
+  const severitySelect = document.getElementById("issueQuickSeverity");
+  const filterSelect = document.getElementById("issueQuickFilter");
+  if (!form || !titleInput || !projectSelect || !severitySelect) return;
+
+  populateIssueProjectSelect();
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const title = String(titleInput.value || "").trim();
+    if (!title) return;
+
+    const projectOption = projectSelect.selectedOptions && projectSelect.selectedOptions[0];
+    const issue = normalizeIssue({
+      id: nextIssueId(projectSelect.value || "", projectOption ? projectOption.textContent : "General"),
+      title,
+      projectId: projectSelect.value || "",
+      projectTitle: projectOption ? projectOption.textContent : "General / Unassigned",
+      severity: severitySelect.value || "P2",
+      status: "open",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const state = loadIssueTrackerState();
+    state.issues.unshift(issue);
+    saveIssueTrackerState(state);
+
+    titleInput.value = "";
+    titleInput.focus();
+    renderAllPreviews();
+  });
+
+  if (filterSelect) {
+    filterSelect.addEventListener("change", () => {
+      renderAllPreviews();
+    });
+  }
 }
 
 function todayKey() {
@@ -776,6 +1236,7 @@ function renderAllPreviews() {
       if (type === "hobbies") return renderHobbiesPreview(target);
       if (type === "journal") return renderJournalPreview(target);
       if (type === "calendar") return renderCalendarPreview(target);
+      if (type === "issues") return renderIssuesPreview(target);
       if (type === "links") return renderLinksPreview(target);
       if (type === "pomodoro") return renderPomodoroPreview(target);
       if (type === "sync") return renderSyncPreview(target);
@@ -790,6 +1251,7 @@ function renderAllPreviews() {
 }
 
 function initPreviews() {
+  initIssueQuickForm();
   seedDashboardCalendarDemoDataIfNeeded();
   if (typeof window !== "undefined") {
     const protocol = String((window.location && window.location.protocol) || "").toLowerCase();

@@ -3,8 +3,10 @@
 A lightweight personal dashboard to track tasks, projects, journaling, habits, and focus sessions.
 
 ## Versions
-- Dashboard app: `v0.2.0`
-- Local agent chat: `v0.1``r`n`r`n## Features
+- Single source of truth: `public/js/version.js`
+- Dashboard and Agent versions are read from that file by both UI and server.
+
+## Features
 - Home overview with quick access
 - To-do list with priorities and due dates
 - Projects + learning tracker
@@ -12,20 +14,11 @@ A lightweight personal dashboard to track tasks, projects, journaling, habits, a
 - Calendar view of tasks and schedules
 - Hobbies tracker with streaks
 - Pomodoro timer
-- Local backup & restore tools
-
-## Local Backup (No Cloud)
-The app stores active data in browser storage for speed.
-To keep data permanent on your PC even if browser data is cleared:
-
-1. Open `http://localhost:8080/sync.html`
-2. Click `Choose backup file` and select a JSON file on disk
-3. Enable `Auto snapshot`
-4. Optionally click `Save snapshot now` any time
-
-If browser data is ever cleared, use:
-- `Restore snapshot file` (if the chosen file handle is still available), or
-- `Import JSON` using your saved backup file.
+- Server-first state sync (`/api/state`) as source of truth
+- Settings & Backup page:
+  - local snapshot export/import
+  - server backup list + one-click restore
+  - upload backup JSON to server from any device
 
 ## Local Agent Chat (Optional)
 You can run a local AI chat assistant with dashboard context and open it from the bottom-right chat button.
@@ -62,4 +55,9 @@ The launcher will:
 - start dashboard server,
 - print local + LAN URLs.
 
-
+## Data & Backups
+- Active app state is persisted on server in `user_data/server_state.json`.
+- Great-delta backups are stored in:
+  - `user_data/state_backups`
+  - `user_data/backup_backup/state_backups`
+- Each backup location keeps the latest 10 files.
