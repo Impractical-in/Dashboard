@@ -31,3 +31,8 @@ working_server_version/script_test/.dashboard-ollama.pid
 **/server_stats*.json
 /dserver_stats*.json
 **/dserver_stats*.json
+# Misc local artifacts
+/old_backup/
+**/.DS_Store
+*.log
+/ervices.msc
