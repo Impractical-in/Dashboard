@@ -15,6 +15,7 @@ let metaUpdateInProgress = false;
 let serverPushTimer = null;
 let serverPushInFlight = false;
 let suppressServerPush = false;
+const dirtyStateKeys = new Set();
 
 function canUseServerStateSync() {
   if (typeof window === "undefined" || !window.location) return false;
@@ -50,6 +51,7 @@ function loadData(key, fallback) {
 
 function saveData(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
+  dirtyStateKeys.add(key);
   if (storageReady) {
     idbSet(key, value);
   }
@@ -68,6 +70,7 @@ function updateMeta() {
     lastSavedAt: new Date().toISOString(),
   };
   localStorage.setItem(META_KEY, JSON.stringify(meta));
+  dirtyStateKeys.add(META_KEY);
   if (storageReady) {
     idbSet(META_KEY, meta);
   }
@@ -252,6 +255,7 @@ function applyServerState(data) {
     localStorage.setItem(key, JSON.stringify(value));
     if (storageReady) idbSet(key, value);
   });
+  dirtyStateKeys.clear();
   suppressServerPush = false;
 }
 
@@ -277,8 +281,26 @@ async function pushStateToServer() {
   if (serverPushInFlight || !storageReady || suppressServerPush || !canUseServerStateSync()) return;
   serverPushInFlight = true;
   try {
-    const data = buildStateSnapshot();
-    await postStateToServer(data);
+    const localSnapshot = buildStateSnapshot();
+    let payload = localSnapshot;
+
+    if (dirtyStateKeys.size > 0) {
+      try {
+        const serverSnapshot = await fetchStateFromServer();
+        const merged = { ...(serverSnapshot || {}) };
+        dirtyStateKeys.forEach((key) => {
+          if (Object.prototype.hasOwnProperty.call(localSnapshot, key)) {
+            merged[key] = localSnapshot[key];
+          }
+        });
+        payload = merged;
+      } catch (err) {
+        payload = localSnapshot;
+      }
+    }
+
+    await postStateToServer(payload);
+    dirtyStateKeys.clear();
   } catch (err) {
     // Non-fatal: next save will retry.
   } finally {
