@@ -467,12 +467,12 @@ option {
 .issue-quick-row {
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) 160px auto;
+  grid-template-columns: 110px minmax(0, 1fr) 150px auto;
   align-items: center;
 }
 
 .issue-filter-row {
-  grid-template-columns: auto 220px;
+  grid-template-columns: auto 180px 140px;
   justify-content: start;
 }
 
@@ -529,6 +529,18 @@ option {
   padding: 5px 8px;
   font-size: 11px;
   width: fit-content;
+}
+
+.preview-pill.bug {
+  border-color: #c96f47;
+  color: #6d3118;
+  background: rgba(201, 111, 71, 0.2);
+}
+
+.preview-pill.fr {
+  border-color: #4a8dcf;
+  color: #1d4f7a;
+  background: rgba(74, 141, 207, 0.18);
 }
 
 .issue-details {

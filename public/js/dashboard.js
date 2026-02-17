@@ -287,8 +287,10 @@ function issueStatusRank(status) {
 
 function normalizeIssue(issue) {
   const source = issue && typeof issue === "object" ? issue : {};
+  const kind = String(source.kind || "bug").toLowerCase() === "fr" ? "fr" : "bug";
   return {
     id: String(source.id || ""),
+    kind,
     title: String(source.title || "").trim(),
     projectId: String(source.projectId || ""),
     projectTitle: String(source.projectTitle || "General"),
@@ -301,6 +303,7 @@ function normalizeIssue(issue) {
     expected: String(source.expected || ""),
     actual: String(source.actual || ""),
     fixNotes: String(source.fixNotes || ""),
+    impact: String(source.impact || ""),
     history: Array.isArray(source.history)
       ? source.history
         .filter((entry) => entry && typeof entry === "object")
@@ -378,13 +381,14 @@ function projectCodeForIssue(projectId, projectTitle) {
   return nextCodes[key];
 }
 
-function nextIssueId(projectId, projectTitle) {
+function nextIssueId(projectId, projectTitle, kind) {
   const stamp = issueDateStamp(new Date());
   const meta = readIssueMeta();
   const seq = meta.date === stamp ? Number(meta.seq || 0) + 1 : 1;
   const projectCode = projectCodeForIssue(projectId, projectTitle);
   writeIssueMeta({ ...meta, date: stamp, seq });
-  return `BUG-${projectCode}-${stamp}-${String(seq).padStart(4, "0")}`;
+  const prefix = String(kind || "bug").toLowerCase() === "fr" ? "FR" : "BUG";
+  return `${prefix}-${projectCode}-${stamp}-${String(seq).padStart(4, "0")}`;
 }
 
 function issueProjectOptions() {
@@ -425,10 +429,20 @@ function issueFilterValue() {
   return select ? String(select.value || "open") : "open";
 }
 
+function issueTypeFilterValue() {
+  const select = document.getElementById("issueQuickTypeFilter");
+  return select ? String(select.value || "all") : "all";
+}
+
 function issueMatchesFilter(issue, filter) {
   if (filter === "all") return true;
   if (filter === "active") return issue.status === "open" || issue.status === "in_progress";
   return issue.status === "open";
+}
+
+function issueMatchesTypeFilter(issue, typeFilter) {
+  if (typeFilter === "all") return true;
+  return (issue.kind || "bug") === typeFilter;
 }
 
 function updateIssueStatus(issueId, status) {
@@ -492,8 +506,9 @@ function renderIssuesPreview(target) {
   populateIssueProjectSelect();
   const state = loadIssueTrackerState();
   const filter = issueFilterValue();
+  const typeFilter = issueTypeFilterValue();
   const filtered = state.issues
-    .filter((issue) => issue && issueMatchesFilter(issue, filter))
+    .filter((issue) => issue && issueMatchesFilter(issue, filter) && issueMatchesTypeFilter(issue, typeFilter))
     .sort((a, b) => {
       const statusDelta = issueStatusRank(a.status) - issueStatusRank(b.status);
       if (statusDelta !== 0) return statusDelta;
@@ -525,8 +540,13 @@ function renderIssuesPreview(target) {
     const sevEl = document.createElement("span");
     sevEl.className = `preview-pill ${String(issue.severity || "P2").toLowerCase()}`;
     sevEl.textContent = issue.severity || "P2";
+    const kindEl = document.createElement("span");
+    const kind = issue.kind || "bug";
+    kindEl.className = `preview-pill ${kind === "fr" ? "fr" : "bug"}`;
+    kindEl.textContent = kind === "fr" ? "FR" : "BUG";
     head.appendChild(idEl);
     head.appendChild(sevEl);
+    head.appendChild(kindEl);
 
     const titleEl = document.createElement("div");
     titleEl.className = "issue-title";
@@ -535,7 +555,7 @@ function renderIssuesPreview(target) {
     const metaEl = document.createElement("div");
     metaEl.className = "issue-meta";
     const updated = issue.updatedAt ? formatShortDate(issue.updatedAt, true) : "";
-    metaEl.textContent = `${issue.projectTitle || "General"} • ${issueStatusLabel(issue.status)}${updated ? ` • Updated ${updated}` : ""}`;
+    metaEl.textContent = `${issue.projectTitle || "General"} | ${issueStatusLabel(issue.status)}${updated ? ` | Updated ${updated}` : ""}`;
 
     const statusSelect = document.createElement("select");
     statusSelect.className = "issue-status";
@@ -580,17 +600,28 @@ function renderIssuesPreview(target) {
       return { wrapper, area };
     }
 
-    const analysis = makeField("Analysis (optional)", "analysis", "Why is this happening?");
-    const repro = makeField("Steps To Reproduce (optional)", "stepsToReproduce", "Step 1, Step 2...");
+    const isFr = issue.kind === "fr";
+    const analysis = makeField("Analysis (optional)", "analysis", isFr ? "Why is this feature needed?" : "Why is this happening?");
+    const repro = makeField(
+      isFr ? "Proposal Details (optional)" : "Steps To Reproduce (optional)",
+      "stepsToReproduce",
+      isFr ? "Requested flow and UI behavior" : "Step 1, Step 2..."
+    );
     const expected = makeField("Expected (optional)", "expected", "Expected behavior");
     const actual = makeField("Actual (optional)", "actual", "What actually happened");
     const fixNotes = makeField("Fix Notes (optional)", "fixNotes", "Root cause / fix summary");
+    const impact = makeField(
+      isFr ? "Business/User Impact (optional)" : "Impact (optional)",
+      "impact",
+      isFr ? "Who benefits and why" : "What users are affected"
+    );
 
     detailsBody.appendChild(analysis.wrapper);
     detailsBody.appendChild(repro.wrapper);
     detailsBody.appendChild(expected.wrapper);
     detailsBody.appendChild(actual.wrapper);
     detailsBody.appendChild(fixNotes.wrapper);
+    detailsBody.appendChild(impact.wrapper);
 
     const actionsRow = document.createElement("div");
     actionsRow.className = "issue-detail-actions";
@@ -650,6 +681,7 @@ function renderIssuesPreview(target) {
         expected: expected.area.value.trim(),
         actual: actual.area.value.trim(),
         fixNotes: fixNotes.area.value.trim(),
+        impact: impact.area.value.trim(),
       });
       renderAllPreviews();
     });
@@ -677,12 +709,33 @@ function renderIssuesPreview(target) {
 function initIssueQuickForm() {
   const form = document.getElementById("issueQuickForm");
   const titleInput = document.getElementById("issueQuickTitle");
+  const typeSelect = document.getElementById("issueQuickType");
   const projectSelect = document.getElementById("issueQuickProject");
   const severitySelect = document.getElementById("issueQuickSeverity");
   const filterSelect = document.getElementById("issueQuickFilter");
-  if (!form || !titleInput || !projectSelect || !severitySelect) return;
+  const typeFilterSelect = document.getElementById("issueQuickTypeFilter");
+  if (!form || !titleInput || !projectSelect || !severitySelect || !typeSelect) return;
 
   populateIssueProjectSelect();
+
+  const refreshTypeUX = () => {
+    const type = String(typeSelect.value || "bug").toLowerCase();
+    if (type === "fr") {
+      titleInput.placeholder = "What feature is requested? (example: add weekly trend chart)";
+      severitySelect.options[0].textContent = "P1 Must Have";
+      severitySelect.options[1].textContent = "P2 Should Have";
+      severitySelect.options[2].textContent = "P3 Could Have";
+      severitySelect.options[3].textContent = "P4 Nice To Have";
+    } else {
+      titleInput.placeholder = "What broke? (example: week view empty on reload)";
+      severitySelect.options[0].textContent = "P1 Critical";
+      severitySelect.options[1].textContent = "P2 High";
+      severitySelect.options[2].textContent = "P3 Medium";
+      severitySelect.options[3].textContent = "P4 Low";
+    }
+  };
+  refreshTypeUX();
+  typeSelect.addEventListener("change", refreshTypeUX);
 
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -690,8 +743,10 @@ function initIssueQuickForm() {
     if (!title) return;
 
     const projectOption = projectSelect.selectedOptions && projectSelect.selectedOptions[0];
+    const kind = String(typeSelect.value || "bug").toLowerCase() === "fr" ? "fr" : "bug";
     const issue = normalizeIssue({
-      id: nextIssueId(projectSelect.value || "", projectOption ? projectOption.textContent : "General"),
+      id: nextIssueId(projectSelect.value || "", projectOption ? projectOption.textContent : "General", kind),
+      kind,
       title,
       projectId: projectSelect.value || "",
       projectTitle: projectOption ? projectOption.textContent : "General / Unassigned",
@@ -712,6 +767,11 @@ function initIssueQuickForm() {
 
   if (filterSelect) {
     filterSelect.addEventListener("change", () => {
+      renderAllPreviews();
+    });
+  }
+  if (typeFilterSelect) {
+    typeFilterSelect.addEventListener("change", () => {
       renderAllPreviews();
     });
   }

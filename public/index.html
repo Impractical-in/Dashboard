@@ -52,6 +52,10 @@
               required
             />
             <div class="issue-quick-row">
+              <select id="issueQuickType" aria-label="Select item type">
+                <option value="bug" selected>Bug</option>
+                <option value="fr">FR</option>
+              </select>
               <select id="issueQuickProject" aria-label="Select project"></select>
               <select id="issueQuickSeverity" aria-label="Select severity">
                 <option value="P1">P1 Critical</option>
@@ -67,6 +71,11 @@
                 <option value="open">Open</option>
                 <option value="active">Open + In Progress</option>
                 <option value="all">All</option>
+              </select>
+              <select id="issueQuickTypeFilter" aria-label="Issue type filter">
+                <option value="all" selected>All Types</option>
+                <option value="bug">Bugs</option>
+                <option value="fr">FRs</option>
               </select>
             </div>
           </form>
