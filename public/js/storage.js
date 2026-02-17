@@ -8,6 +8,7 @@ const APP_VERSION =
     ? window.DASHBOARD_VERSIONS.dashboard
     : "0.0.0";
 const SERVER_STATE_ENDPOINT = "/api/state";
+const SERVER_PULL_INTERVAL_MS = 8000;
 
 let storageReady = false;
 let storageInitPromise = null;
@@ -15,6 +16,8 @@ let metaUpdateInProgress = false;
 let serverPushTimer = null;
 let serverPushInFlight = false;
 let suppressServerPush = false;
+let serverPullTimer = null;
+let serverPullInFlight = false;
 const dirtyStateKeys = new Set();
 
 function canUseServerStateSync() {
@@ -248,15 +251,24 @@ function buildStateSnapshot() {
   return data;
 }
 
-function applyServerState(data) {
+function applyServerState(data, options = {}) {
+  const clearDirty = options.clearDirty !== false;
   suppressServerPush = true;
   getLocalKeys().forEach((key) => localStorage.removeItem(key));
   Object.entries(data || {}).forEach(([key, value]) => {
     localStorage.setItem(key, JSON.stringify(value));
     if (storageReady) idbSet(key, value);
   });
-  dirtyStateKeys.clear();
+  if (clearDirty) dirtyStateKeys.clear();
   suppressServerPush = false;
+}
+
+function snapshotsEqual(a, b) {
+  try {
+    return JSON.stringify(a || {}) === JSON.stringify(b || {});
+  } catch (err) {
+    return false;
+  }
 }
 
 async function fetchStateFromServer() {
@@ -314,3 +326,65 @@ function queueServerPush() {
     pushStateToServer().catch(() => {});
   }, 350);
 }
+
+async function pullStateFromServer() {
+  if (
+    serverPullInFlight ||
+    !storageReady ||
+    suppressServerPush ||
+    !canUseServerStateSync()
+  ) {
+    return;
+  }
+  serverPullInFlight = true;
+  try {
+    const serverSnapshot = await fetchStateFromServer();
+    const localSnapshot = buildStateSnapshot();
+
+    if (dirtyStateKeys.size > 0) {
+      const merged = { ...(serverSnapshot || {}) };
+      dirtyStateKeys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(localSnapshot, key)) {
+          merged[key] = localSnapshot[key];
+        }
+      });
+      if (!snapshotsEqual(localSnapshot, merged)) {
+        applyServerState(merged, { clearDirty: false });
+      }
+      queueServerPush();
+      return;
+    }
+
+    if (!snapshotsEqual(localSnapshot, serverSnapshot)) {
+      applyServerState(serverSnapshot);
+    }
+  } catch (err) {
+    // Non-fatal: retry on next cycle.
+  } finally {
+    serverPullInFlight = false;
+  }
+}
+
+function startServerPullLoop() {
+  if (serverPullTimer || !canUseServerStateSync()) return;
+  serverPullTimer = setInterval(() => {
+    pullStateFromServer().catch(() => {});
+  }, SERVER_PULL_INTERVAL_MS);
+
+  if (typeof window !== "undefined") {
+    window.addEventListener("focus", () => {
+      pullStateFromServer().catch(() => {});
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        pullStateFromServer().catch(() => {});
+      }
+    });
+  }
+}
+
+initStorage()
+  .then(() => {
+    startServerPullLoop();
+  })
+  .catch(() => {});

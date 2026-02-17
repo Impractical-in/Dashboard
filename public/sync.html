@@ -11,81 +11,44 @@
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Settings & Backup</div>
-        <div class="subtitle">Settings and backup controls</div>
+        <div class="title">Backup</div>
+        <div class="subtitle">Save snapshot or upload snapshot</div>
       </div>
       <a class="btn ghost" href="index.html">Back to Home</a>
     </header>
 
     <main class="stack">
       <section class="card">
-        <div class="section-title">Local auto backup (Chromium)</div>
-        <div class="status" id="localStatus">No backup file selected</div>
-        <div class="status success" id="localSuccess" hidden>Backup successful</div>
-        <div class="actions">
-          <button class="btn primary" id="chooseLocalFileBtn" type="button">
-            Choose backup file
-            <span class="btn-sub" id="lastSavedLabel">Never</span>
-          </button>
-          <button class="btn" id="localSaveBtn" type="button">
-            Save snapshot now
-            <span class="btn-sub" id="lastBackupLabel">Never</span>
-          </button>
-          <button class="btn" id="localRestoreBtn" type="button">Restore snapshot file</button>
+        <div class="section-title">1) Save Current Snapshot</div>
+        <div class="row">
+          <label for="snapshotTarget">Save to</label>
+          <select id="snapshotTarget">
+            <option value="server">Server</option>
+            <option value="device">My Device</option>
+          </select>
+          <button class="btn primary" id="saveSnapshotBtn" type="button">Save Snapshot</button>
         </div>
-        <div class="field">
-          <span>Auto snapshot</span>
-          <div class="actions">
-            <label class="toggle">
-              <input id="localAutoBackup" type="checkbox" />
-              <span>Enable</span>
-            </label>
-            <select id="localBackupInterval">
-              <option value="1">Every 1 hour</option>
-              <option value="2">Every 2 hours</option>
-              <option value="5">Every 5 hours</option>
-              <option value="12">Every 12 hours</option>
-              <option value="20">Every 20 hours</option>
-              <option value="24" selected>Every 24 hours</option>
-            </select>
-          </div>
-        </div>
-        <div class="hint">Choose a JSON file once and the app can keep updating that file on your disk.</div>
+        <div class="hint">Filename format: <code>server_state_YYYYMMDD_HHMMSS.json</code></div>
       </section>
 
       <section class="card">
-        <div class="section-title">Server backups (one-click restore)</div>
-        <div class="status" id="serverBackupStatus">Loading backup list...</div>
-        <div class="actions">
-          <select id="serverBackupSelect"></select>
-          <button class="btn" id="refreshServerBackupsBtn" type="button">Refresh</button>
-          <button class="btn primary" id="restoreServerBackupBtn" type="button">Restore selected</button>
+        <div class="section-title">2) Upload Snapshot</div>
+        <div class="row">
+          <input id="snapshotUploadInput" type="file" accept="application/json" />
+          <button class="btn" id="uploadSnapshotBtn" type="button">Upload Snapshot</button>
         </div>
-        <div class="hint">Keeps up to 10 great-delta snapshots. Restore replaces current server state.</div>
-        <div class="actions">
-          <label class="btn ghost">
-            Upload backup JSON to server
-            <input id="serverBackupUploadInput" type="file" accept="application/json" />
-          </label>
-          <button class="btn" id="uploadServerBackupBtn" type="button">Upload</button>
-        </div>
+        <div class="hint">Uploads selected JSON snapshot to server backup storage.</div>
       </section>
 
       <section class="card">
-        <div class="section-title">Local export/import (manual)</div>
-        <div class="actions">
-          <button class="btn" id="exportBtn" type="button">Export JSON</button>
-          <label class="btn ghost">
-            Import JSON
-            <input id="importInput" type="file" accept="application/json" />
-          </label>
-        </div>
+        <div class="status" id="backupStatus">Ready.</div>
       </section>
     </main>
 
+    <script src="js/version.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/sync.js"></script>
-      <script src="js/agent-chat.js"></script>
+    <script src="js/agent-chat.js"></script>
   </body>
 </html>
 
