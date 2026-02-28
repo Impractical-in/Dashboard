@@ -1,151 +1,153 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
-    <link rel="stylesheet" href="css/oat-bridge.css" />
-    <title>Local Dashboard</title>
+    <title>Dashboard</title>
     <link rel="stylesheet" href="css/dashboard.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
-      <div>
-        <div class="title">Local Dashboard</div>
+      <div class="topbar-left">
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
         <div class="subtitle">Focus, projects, and learning in one place</div>
       </div>
-      <button id="timeToggle" class="timebar" type="button" aria-expanded="false">
-        <div id="localDateTime" class="time-text"></div>
-      </button>
+      <div class="topbar-right">
+        <button id="timeToggle" class="timebar" type="button" aria-expanded="false">
+          <div id="localDateTime" class="time-text"></div>
+        </button>
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+      </div>
     </header>
 
-    <main class="grid">
-      <a class="tile link-tile todo top-focus" href="todo.html">
-        <div class="tile-icon">TD</div>
-        <div class="tile-body">
-          <div class="tile-title">To-Do List</div>
-          <div class="tile-subtitle">Priorities, due dates, and quick picks</div>
-          <div class="tile-preview" data-preview="todo"></div>
-        </div>
-      </a>
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn is-active" href="index.html" aria-current="page">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
-      <a class="tile link-tile projects top-focus" href="projects.html">
-        <div class="tile-icon">PR</div>
-        <div class="tile-body">
-          <div class="tile-title">Projects + Learning</div>
-          <div class="tile-subtitle">Plan, track, and take notes</div>
-          <div class="tile-preview" data-preview="projects"></div>
+    <main class="home-shell">
+      <section class="overview-pane" id="overviewPane" aria-label="Overview Pane">
+        <div class="pane-header">
+          <h1 class="pane-title">Overview</h1>
+          <p class="pane-subtitle">Current home dashboard view</p>
         </div>
-      </a>
 
-      <section class="tile issues top-focus" aria-label="Issue Tracker">
-        <div class="tile-icon">IS</div>
-        <div class="tile-body">
-          <div class="tile-title">Issue Tracker</div>
-          <div class="tile-subtitle">Track bugs by project with stable issue IDs</div>
-          <form class="issue-quick-form" id="issueQuickForm">
-            <input
-              id="issueQuickTitle"
-              type="text"
-              placeholder="What broke? (example: week view empty on reload)"
-              maxlength="140"
-              required
-            />
-            <div class="issue-quick-row">
-              <select id="issueQuickType" aria-label="Select item type">
-                <option value="bug" selected>Bug</option>
-                <option value="fr">FR</option>
-              </select>
-              <select id="issueQuickProject" aria-label="Select project"></select>
-              <select id="issueQuickSeverity" aria-label="Select severity">
-                <option value="P1">P1 Critical</option>
-                <option value="P2" selected>P2 High</option>
-                <option value="P3">P3 Medium</option>
-                <option value="P4">P4 Low</option>
-              </select>
-              <button class="btn issue-add-btn" type="submit">Add Issue</button>
+        <div class="grid">
+          <a class="tile link-tile todo top-focus" href="todo.html">
+            <div class="tile-icon">TD</div>
+            <div class="tile-body">
+              <div class="tile-title">To-Do List</div>
+              <div class="tile-subtitle">Priorities, due dates, and quick picks</div>
+              <div class="tile-preview" data-preview="todo"></div>
             </div>
-            <div class="issue-quick-row issue-filter-row">
-              <label for="issueQuickFilter">View</label>
-              <select id="issueQuickFilter" aria-label="Issue view filter">
-                <option value="open">Open</option>
-                <option value="active">Open + In Progress</option>
-                <option value="all">All</option>
-              </select>
-              <select id="issueQuickTypeFilter" aria-label="Issue type filter">
-                <option value="all" selected>All Types</option>
-                <option value="bug">Bugs</option>
-                <option value="fr">FRs</option>
-              </select>
+          </a>
+
+          <a class="tile link-tile projects top-focus" href="projects.html">
+            <div class="tile-icon">PR</div>
+            <div class="tile-body">
+              <div class="tile-title">Projects + Learning</div>
+              <div class="tile-subtitle">Plan, track, and take notes</div>
+              <div class="tile-preview" data-preview="projects"></div>
             </div>
-          </form>
-          <div class="tile-preview" data-preview="issues"></div>
+          </a>
+
+          <section class="tile issues top-focus" aria-label="Issue Tracker">
+            <div class="tile-icon">IS</div>
+            <div class="tile-body">
+              <div class="tile-title">Issue Tracker</div>
+              <div class="tile-subtitle">Track bugs by project with stable issue IDs</div>
+              <form class="issue-quick-form" id="issueQuickForm">
+                <input
+                  id="issueQuickTitle"
+                  type="text"
+                  placeholder="What broke? (example: week view empty on reload)"
+                  maxlength="140"
+                  required
+                />
+                <div class="issue-quick-row">
+                  <select id="issueQuickType" aria-label="Select item type">
+                    <option value="bug" selected>Bug</option>
+                    <option value="fr">FR</option>
+                  </select>
+                  <select id="issueQuickProject" aria-label="Select project"></select>
+                  <select id="issueQuickSeverity" aria-label="Select severity">
+                    <option value="P1">P1 Critical</option>
+                    <option value="P2" selected>P2 High</option>
+                    <option value="P3">P3 Medium</option>
+                    <option value="P4">P4 Low</option>
+                  </select>
+                  <button class="btn issue-add-btn" type="submit">Add Issue</button>
+                </div>
+                <div class="issue-quick-row issue-filter-row">
+                  <label for="issueQuickFilter">View</label>
+                  <select id="issueQuickFilter" aria-label="Issue view filter">
+                    <option value="open">Open</option>
+                    <option value="active">Open + In Progress</option>
+                    <option value="all">All</option>
+                  </select>
+                  <select id="issueQuickTypeFilter" aria-label="Issue type filter">
+                    <option value="all" selected>All Types</option>
+                    <option value="bug">Bugs</option>
+                    <option value="fr">FRs</option>
+                  </select>
+                </div>
+              </form>
+              <div class="tile-preview" data-preview="issues"></div>
+            </div>
+          </section>
+
+          <a class="tile link-tile calendar" href="calendar.html">
+            <div class="tile-icon">CL</div>
+            <div class="tile-body">
+              <div class="tile-title">Calendar</div>
+              <div class="tile-subtitle">Tasks, hobbies, and schedules</div>
+              <div class="tile-preview" data-preview="calendar"></div>
+            </div>
+          </a>
+
+          <section class="tile more-pages" aria-label="More Pages">
+            <div class="tile-icon">MP</div>
+            <div class="tile-body">
+              <div class="tile-title">More Pages</div>
+              <div class="tile-subtitle">Each module has its own page</div>
+              <div class="more-links">
+                <a href="hobbies.html">Hobbies Tracker</a>
+                <a href="journal.html">Journal</a>
+                <a href="links.html">Quick Links</a>
+                <a href="pomodoro.html">Pomodoro Timer</a>
+                <a href="sync.html">Settings & Backup</a>
+              </div>
+            </div>
+          </section>
         </div>
       </section>
-
-      <a class="tile link-tile hobbies" href="hobbies.html">
-        <div class="tile-icon">HB</div>
-        <div class="tile-body">
-          <div class="tile-title">Hobbies Tracker</div>
-          <div class="tile-subtitle">Streaks, time estimates, and progress</div>
-          <div class="tile-preview" data-preview="hobbies"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile journal" href="journal.html">
-        <div class="tile-icon">JR</div>
-        <div class="tile-body">
-          <div class="tile-title">Journal</div>
-          <div class="tile-subtitle">Ideas with linked context</div>
-          <div class="tile-preview" data-preview="journal"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile calendar" href="calendar.html">
-        <div class="tile-icon">CL</div>
-        <div class="tile-body">
-          <div class="tile-title">Calendar</div>
-          <div class="tile-subtitle">Tasks, hobbies, and schedules</div>
-          <div class="tile-preview" data-preview="calendar"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile links" href="links.html">
-        <div class="tile-icon">LN</div>
-        <div class="tile-body">
-          <div class="tile-title">Quick Links</div>
-          <div class="tile-subtitle">Editable shortcuts</div>
-          <div class="tile-preview" data-preview="links"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile pomodoro" href="pomodoro.html">
-        <div class="tile-icon">PM</div>
-        <div class="tile-body">
-          <div class="tile-title">Pomodoro Timer</div>
-          <div class="tile-subtitle">Open the session timer and log</div>
-          <div class="tile-preview" data-preview="pomodoro"></div>
-        </div>
-      </a>
-
-      <a class="tile link-tile sync" href="sync.html">
-        <div class="tile-icon">BK</div>
-        <div class="tile-body">
-          <div class="tile-title">Settings & Backup</div>
-          <div class="tile-subtitle">Server restore + local backup tools</div>
-          <div class="tile-preview" data-preview="sync"></div>
-        </div>
-      </a>
     </main>
+
     <div id="timePanel" class="time-panel hidden" aria-live="polite"></div>
     <footer class="footer">
-      <span id="appVersion">v0.0.0</span>
-      <span class="footer-divider">·</span>
-      <a class="footer-link" href="https://impractical.in" target="_blank" rel="noreferrer">impractical.in</a>
+      <a class="footer-link" href="https://impractical.in" target="_blank" rel="noreferrer"
+        >impractical.in</a
+      >
     </footer>
     <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/dashboard.js"></script>
-    <script src="js/agent-chat.js"></script>
   </body>
 </html>

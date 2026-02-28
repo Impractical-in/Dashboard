@@ -24,6 +24,7 @@ const quickButtons = document.querySelectorAll("[data-quick]");
 const formToggle = document.getElementById("taskFormToggle");
 const formWrap = document.getElementById("taskFormWrap");
 const formCard = document.getElementById("taskFormCard");
+const Core = window.DashboardCore;
 
 const STORAGE_KEY = "todoTasks";
 const ARCHIVE_KEY = "todoArchive";
@@ -63,16 +64,11 @@ function saveArchive() {
 }
 
 function parseDateOnly(value) {
-  if (!value) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return Core.date.parseDateOnly(value);
 }
 
 function parseDate(value) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  return Core.date.parseDateTime(value);
 }
 
 function formatDue(dateValue) {
@@ -82,56 +78,15 @@ function formatDue(dateValue) {
 }
 
 function normalizeChecklist(list) {
-  if (!Array.isArray(list)) return [];
-  return list
-    .map((item) => {
-      if (typeof item === "string") {
-        const text = item.trim();
-        if (!text) return null;
-        return { id: generateId(), text, done: false, completedAt: "" };
-      }
-      if (!item || typeof item !== "object") return null;
-      const text = String(item.text || "").trim();
-      if (!text) return null;
-      return {
-        id: item.id || generateId(),
-        text,
-        done: Boolean(item.done),
-        completedAt: item.completedAt || "",
-      };
-    })
-    .filter(Boolean);
+  return Core.tasks.normalizeChecklist(list);
 }
 
 function parseChecklistInput(value, existing = []) {
-  const previous = new Map();
-  normalizeChecklist(existing).forEach((item) => {
-    previous.set(item.text.toLowerCase(), item);
-  });
-  const lines = String(value || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const seen = new Set();
-  return lines
-    .filter((line) => {
-      const key = line.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .map((line) => {
-      const key = line.toLowerCase();
-      const prior = previous.get(key);
-      if (prior) return { ...prior, text: line };
-      return { id: generateId(), text: line, done: false, completedAt: "" };
-    });
+  return Core.tasks.parseChecklistInput(value, existing);
 }
 
 function checklistToText(list) {
-  return normalizeChecklist(list)
-    .map((item) => item.text)
-    .join("\n");
+  return Core.tasks.checklistToText(list);
 }
 
 function renderChecklist(task) {
@@ -142,12 +97,14 @@ function renderChecklist(task) {
       (item) => `
       <label class="checklist-item ${item.done ? "done" : ""}">
         <input type="checkbox" data-check-task="${task.id}" data-check-item="${item.id}" ${
-        item.done ? "checked" : ""
-      } />
+          item.done ? "checked" : ""
+        } />
         <span class="checklist-content">
           <span class="checklist-text">${item.text}</span>
           <span class="checklist-time">${
-            item.done && item.completedAt ? `Done ${new Date(item.completedAt).toLocaleString()}` : ""
+            item.done && item.completedAt
+              ? `Done ${new Date(item.completedAt).toLocaleString()}`
+              : ""
           }</span>
         </span>
       </label>
@@ -158,23 +115,11 @@ function renderChecklist(task) {
 }
 
 function comparePriority(a, b) {
-  const order = { P1: 1, P2: 2, P3: 3, P4: 4 };
-  return (order[a] || 9) - (order[b] || 9);
+  return Core.tasks.comparePriority(a, b);
 }
 
 function sortTasks(list) {
-  return [...list].sort((a, b) => {
-    const dueA = a.due || "";
-    const dueB = b.due || "";
-    if (dueA === dueB) {
-      const priorityCompare = comparePriority(a.priority, b.priority);
-      if (priorityCompare !== 0) return priorityCompare;
-      return a.title.localeCompare(b.title);
-    }
-    if (!dueA) return 1;
-    if (!dueB) return -1;
-    return dueA.localeCompare(dueB);
-  });
+  return Core.tasks.sortTasks(list);
 }
 
 function isOverdue(task) {
@@ -185,7 +130,7 @@ function isOverdue(task) {
 }
 
 function dayIndex(date) {
-  return (date.getDay() + 6) % 7;
+  return Core.date.dayIndex(date);
 }
 
 function renderScheduleWeek(date) {
@@ -215,9 +160,7 @@ function getScheduleDate() {
 }
 
 function isWithinDateRange(date, startValue, endValue) {
-  const start = parseDateOnly(startValue) || new Date("1970-01-01");
-  const end = parseDateOnly(endValue) || new Date("2999-12-31");
-  return date >= start && date <= end;
+  return Core.date.isWithinDateRange(date, startValue, endValue);
 }
 
 function renderScheduledItems() {
@@ -280,10 +223,7 @@ function renderArchive() {
     const archivedChecklist = normalizeChecklist(task.checklist);
     const checklistHtml = archivedChecklist.length
       ? `<ul class="archive-checklist">${archivedChecklist
-          .map(
-            (entry) =>
-              `<li class="${entry.done ? "done" : ""}">${entry.text}</li>`
-          )
+          .map((entry) => `<li class="${entry.done ? "done" : ""}">${entry.text}</li>`)
           .join("")}</ul>`
       : "";
     item.className = "task";
@@ -308,8 +248,7 @@ function renderTasks() {
   const search = searchInput.value.toLowerCase();
 
   const filtered = tasks.filter((task) => {
-    const statusMatch =
-      status === "all" || (status === "done" ? task.done : !task.done);
+    const statusMatch = status === "all" || (status === "done" ? task.done : !task.done);
     const priorityMatch = priority === "all" || task.priority === priority;
     const searchMatch =
       task.title.toLowerCase().includes(search) ||
@@ -329,18 +268,24 @@ function renderTasks() {
   sorted.forEach((task) => {
     const item = document.createElement("div");
     item.className = `task ${isOverdue(task) ? "overdue" : ""}`;
-    const colorDot = task.customColor ? `<span class="color-dot" style="background:${task.customColor}"></span>` : "";
-    const tagHtml = Array.isArray(task.tags) && task.tags.length
-      ? task.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")
-      : "<span class=\"task-meta\">No tags</span>";
-    const linkHtml = Array.isArray(task.linkedItems) && task.linkedItems.length
-      ? task.linkedItems
-          .map((link) => {
-            const found = linkItems.find((item) => `${item.source}:${item.id}` === link);
-            return found ? `<span class="link-pill">${found.label}</span>` : "<span class=\"link-pill\">Linked item</span>";
-          })
-          .join("")
-      : "<span class=\"task-meta\">No linked items</span>";
+    const colorDot = task.customColor
+      ? `<span class="color-dot" style="background:${task.customColor}"></span>`
+      : "";
+    const tagHtml =
+      Array.isArray(task.tags) && task.tags.length
+        ? task.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")
+        : '<span class="task-meta">No tags</span>';
+    const linkHtml =
+      Array.isArray(task.linkedItems) && task.linkedItems.length
+        ? task.linkedItems
+            .map((link) => {
+              const found = linkItems.find((item) => `${item.source}:${item.id}` === link);
+              return found
+                ? `<span class="link-pill">${found.label}</span>`
+                : '<span class="link-pill">Linked item</span>';
+            })
+            .join("")
+        : '<span class="task-meta">No linked items</span>';
     const checklistHtml = renderChecklist(task);
     item.innerHTML = `
       <div class="task-header">
@@ -354,9 +299,7 @@ function renderTasks() {
       ${checklistHtml}
       <div class="task-actions">
         <label class="done-toggle">
-          <input type="checkbox" data-done="${task.id}" ${
-      task.done ? "checked" : ""
-    } />
+          <input type="checkbox" data-done="${task.id}" ${task.done ? "checked" : ""} />
           Done
         </label>
         <button class="btn" data-edit="${task.id}" type="button">Edit</button>
@@ -380,7 +323,10 @@ function addTask(event) {
       task.due = dueInput.value;
       task.notes = notesInput.value.trim();
       task.tags = tags;
-      task.checklist = parseChecklistInput(checklistInput ? checklistInput.value : "", task.checklist);
+      task.checklist = parseChecklistInput(
+        checklistInput ? checklistInput.value : "",
+        task.checklist
+      );
       task.linkedItems = [...currentLinks];
       task.customColor = taskColorInput ? String(taskColorInput.value || "") : "";
     }
@@ -519,7 +465,10 @@ initStorage().then(() => {
     if (task.done) {
       const exists = archive.some((item) => item.id === task.id);
       if (!exists) {
-        archive.unshift({ ...task, completedAt: task.completedAt || task.updatedAt || task.createdAt });
+        archive.unshift({
+          ...task,
+          completedAt: task.completedAt || task.updatedAt || task.createdAt,
+        });
         archiveUpdated = true;
       }
     }
@@ -586,44 +535,15 @@ linkedItems.addEventListener("click", (event) => {
 });
 
 function parseTags(value) {
-  return value
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  return Core.tags.parse(value);
 }
 
 function loadLinkItems() {
-  const projects = loadData(PROJECTS_KEY, []);
-  const tasksData = loadData(STORAGE_KEY, []);
-  const hobbiesData = loadData(HOBBIES_KEY, { hobbies: [] });
-  const hobbies = Array.isArray(hobbiesData.hobbies) ? hobbiesData.hobbies : [];
-
-  const mappedProjects = Array.isArray(projects)
-    ? projects.map((item) => ({
-        id: item.id,
-        label: item.title || "Untitled",
-        type: item.type || "Project",
-        source: "project",
-      }))
-    : [];
-
-  const mappedTasks = Array.isArray(tasksData)
-    ? tasksData.map((item) => ({
-        id: item.id,
-        label: item.title || "Untitled task",
-        type: item.priority || "Task",
-        source: "task",
-      }))
-    : [];
-
-  const mappedHobbies = hobbies.map((item) => ({
-    id: item.id,
-    label: item.name || "Hobby",
-    type: item.type || "Hobby",
-    source: "hobby",
-  }));
-
-  linkItems = [...mappedProjects, ...mappedTasks, ...mappedHobbies];
+  linkItems = Core.links.loadLinkedItems(loadData, {
+    projects: PROJECTS_KEY,
+    tasks: STORAGE_KEY,
+    hobbies: HOBBIES_KEY,
+  });
 }
 
 function renderLinkedItems() {
@@ -688,15 +608,13 @@ function handleSlashCommands() {
           (item) => item.source === "project" && String(item.type).toLowerCase() !== "learning"
         )
       : normalizedType === "learning"
-      ? linkItems.filter(
-          (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
-        )
-      : normalizedType === "task"
-      ? linkItems.filter((item) => item.source === "task")
-      : linkItems.filter((item) => item.source === "hobby");
-  const filtered = query
-    ? list.filter((item) => item.label.toLowerCase().includes(query))
-    : list;
+        ? linkItems.filter(
+            (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
+          )
+        : normalizedType === "task"
+          ? linkItems.filter((item) => item.source === "task")
+          : linkItems.filter((item) => item.source === "hobby");
+  const filtered = query ? list.filter((item) => item.label.toLowerCase().includes(query)) : list;
   setSuggestions(filtered, normalizedType, (item, mode) => {
     const current = notesInput.value;
     const replaced = current.replace(

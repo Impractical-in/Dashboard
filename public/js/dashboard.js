@@ -306,11 +306,11 @@ function normalizeIssue(issue) {
     impact: String(source.impact || ""),
     history: Array.isArray(source.history)
       ? source.history
-        .filter((entry) => entry && typeof entry === "object")
-        .map((entry) => ({
-          at: entry.at || new Date().toISOString(),
-          note: String(entry.note || ""),
-        }))
+          .filter((entry) => entry && typeof entry === "object")
+          .map((entry) => ({
+            at: entry.at || new Date().toISOString(),
+            note: String(entry.note || ""),
+          }))
       : [],
   };
 }
@@ -341,7 +341,9 @@ function normalizeIssueMeta(meta) {
 }
 
 function readIssueMeta() {
-  return normalizeIssueMeta(loadFromStorage(ISSUE_META_KEY, { date: "", seq: 0, projectCodes: {} }));
+  return normalizeIssueMeta(
+    loadFromStorage(ISSUE_META_KEY, { date: "", seq: 0, projectCodes: {} })
+  );
 }
 
 function writeIssueMeta(meta) {
@@ -349,14 +351,20 @@ function writeIssueMeta(meta) {
 }
 
 function toProjectCodeSeed(projectId, projectTitle) {
-  const title = String(projectTitle || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const title = String(projectTitle || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
   if (!title) return "GN";
   if (title.length === 1) return `${title}X`;
   return `${title[0]}${title[1]}`;
 }
 
 function ensureUniqueProjectCode(baseCode, projectId, projectCodes) {
-  const cleanBase = String(baseCode || "GN").toUpperCase().replace(/[^A-Z0-9]/g, "").padEnd(2, "X").slice(0, 2);
+  const cleanBase = String(baseCode || "GN")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .padEnd(2, "X")
+    .slice(0, 2);
   const existingForProject = projectCodes[projectId];
   if (existingForProject) return existingForProject;
   const used = new Set(Object.values(projectCodes || {}));
@@ -508,7 +516,10 @@ function renderIssuesPreview(target) {
   const filter = issueFilterValue();
   const typeFilter = issueTypeFilterValue();
   const filtered = state.issues
-    .filter((issue) => issue && issueMatchesFilter(issue, filter) && issueMatchesTypeFilter(issue, typeFilter))
+    .filter(
+      (issue) =>
+        issue && issueMatchesFilter(issue, filter) && issueMatchesTypeFilter(issue, typeFilter)
+    )
     .sort((a, b) => {
       const statusDelta = issueStatusRank(a.status) - issueStatusRank(b.status);
       if (statusDelta !== 0) return statusDelta;
@@ -601,7 +612,11 @@ function renderIssuesPreview(target) {
     }
 
     const isFr = issue.kind === "fr";
-    const analysis = makeField("Analysis (optional)", "analysis", isFr ? "Why is this feature needed?" : "Why is this happening?");
+    const analysis = makeField(
+      "Analysis (optional)",
+      "analysis",
+      isFr ? "Why is this feature needed?" : "Why is this happening?"
+    );
     const repro = makeField(
       isFr ? "Proposal Details (optional)" : "Steps To Reproduce (optional)",
       "stepsToReproduce",
@@ -745,7 +760,11 @@ function initIssueQuickForm() {
     const projectOption = projectSelect.selectedOptions && projectSelect.selectedOptions[0];
     const kind = String(typeSelect.value || "bug").toLowerCase() === "fr" ? "fr" : "bug";
     const issue = normalizeIssue({
-      id: nextIssueId(projectSelect.value || "", projectOption ? projectOption.textContent : "General", kind),
+      id: nextIssueId(
+        projectSelect.value || "",
+        projectOption ? projectOption.textContent : "General",
+        kind
+      ),
       kind,
       title,
       projectId: projectSelect.value || "",
@@ -1341,4 +1360,3 @@ const footerVersion = document.getElementById("appVersion");
 if (footerVersion && typeof window !== "undefined" && window.APP_VERSION) {
   footerVersion.textContent = `v${window.APP_VERSION}`;
 }
-

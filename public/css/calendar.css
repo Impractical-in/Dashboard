@@ -291,7 +291,6 @@ option {
   }
 }
 
-
 .week-item.draggable {
   cursor: grab;
 }
@@ -301,7 +300,6 @@ option {
   box-shadow: inset 0 0 0 1px #8ec9ff;
   background: rgba(142, 201, 255, 0.14);
 }
-
 
 .week-item-block {
   position: relative;
@@ -322,7 +320,7 @@ option {
   bottom: -3px;
   height: 8px;
   cursor: ns-resize;
-  border-top: 2px solid rgba(255,255,255,0.55);
+  border-top: 2px solid rgba(255, 255, 255, 0.55);
   border-radius: 0 0 6px 6px;
 }
 
@@ -335,7 +333,6 @@ option {
   position: relative;
   z-index: 1;
 }
-
 
 /* Precise Week Alignment */
 :root {
@@ -381,11 +378,9 @@ option {
   margin-right: 2px;
 }
 
-
 .series-item {
-  outline: 1px dashed rgba(255,255,255,0.6);
+  outline: 1px dashed rgba(255, 255, 255, 0.6);
 }
-
 
 .topbar-actions {
   display: flex;
@@ -439,15 +434,13 @@ option {
   color: var(--text);
 }
 
-
 .resize-handle-top {
   top: -3px;
   bottom: auto;
   border-top: none;
-  border-bottom: 2px solid rgba(255,255,255,0.55);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.55);
   border-radius: 6px 6px 0 0;
 }
-
 
 .card-lite {
   margin: 0;

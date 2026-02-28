@@ -18,6 +18,7 @@ const zoomOutBtn = document.getElementById("zoomOutBtn");
 const zoomResetBtn = document.getElementById("zoomResetBtn");
 const formToggle = document.getElementById("entryFormToggle");
 const formWrap = document.getElementById("entryFormWrap");
+const Core = window.DashboardCore;
 
 const STORAGE_KEY = "dashboardEntries";
 const ZOOM_KEY = "ganttZoom";
@@ -34,60 +35,7 @@ let currentLinks = [];
 let formOpen = false;
 
 function normalizeEntries(items) {
-  let migrated = false;
-  const normalized = items.map((entry) => {
-    const copy = { ...entry };
-    if (!Array.isArray(copy.workSegments)) {
-      if (Array.isArray(copy.workLogs)) {
-        copy.workSegments = copy.workLogs
-          .map((log) => {
-            const date = parseDateOnly(log.date);
-            if (!date) return null;
-            const start = new Date(date);
-            start.setHours(9, 0, 0, 0);
-            const hours = Math.max(0, Math.min(24, Number(log.hours) || 0));
-            const end = new Date(start.getTime() + hours * MS_PER_HOUR);
-            return { start: start.toISOString(), end: end.toISOString(), source: "legacy" };
-          })
-          .filter(Boolean);
-        migrated = true;
-      } else {
-        copy.workSegments = [];
-        migrated = true;
-      }
-    }
-    if (!Array.isArray(copy.scheduleDays)) {
-      copy.scheduleDays = [];
-      migrated = true;
-    }
-    if (!Array.isArray(copy.tags)) {
-      copy.tags = [];
-      migrated = true;
-    }
-    if (!Array.isArray(copy.linkedItems)) {
-      copy.linkedItems = [];
-      migrated = true;
-    }
-    if (!Array.isArray(copy.history)) {
-      copy.history = [];
-      migrated = true;
-    }
-    if (!copy.createdAt) {
-      copy.createdAt = new Date().toISOString();
-      migrated = true;
-    }
-    if (!copy.updatedAt) {
-      copy.updatedAt = copy.createdAt;
-      migrated = true;
-    }
-    return copy;
-  });
-
-  if (migrated) {
-    saveData(STORAGE_KEY, normalized);
-  }
-
-  return normalized;
+  return Core.projects.normalizeEntries(items, (next) => saveData(STORAGE_KEY, next));
 }
 
 function loadEntries() {
@@ -116,26 +64,29 @@ function clampZoom(value) {
 }
 
 function parseDateOnly(value) {
-  if (!value) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  parsed.setHours(0, 0, 0, 0);
-  return parsed;
+  return Core.date.parseDateOnly(value);
 }
 
 function parseDateTime(value) {
-  if (!value) return null;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed;
+  return Core.date.parseDateTime(value);
 }
 
 function parseTags(value) {
-  return value
-    .split(",")
-    .map((tag) => tag.trim())
-    .filter(Boolean);
+  return Core.tags.parse(value);
+}
+
+function normalizeCalendarTime(value) {
+  const match = String(value || "")
+    .trim()
+    .match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return match ? `${match[1]}:${match[2]}` : "";
+}
+
+function clampCalendarDuration(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 60;
+  const rounded = Math.round(n / 15) * 15;
+  return Math.max(15, Math.min(720, rounded));
 }
 
 function trackChanges(entry, updates) {
@@ -174,37 +125,11 @@ function renderHistory(entry) {
 }
 
 function loadLinkItems() {
-  const projects = loadData(STORAGE_KEY, []);
-  const tasks = loadData(TASKS_KEY, []);
-  const hobbiesData = loadData(HOBBIES_KEY, { hobbies: [] });
-  const hobbies = Array.isArray(hobbiesData.hobbies) ? hobbiesData.hobbies : [];
-
-  const mappedProjects = Array.isArray(projects)
-    ? projects.map((item) => ({
-        id: item.id,
-        label: item.title || "Untitled",
-        type: item.type || "Project",
-        source: "project",
-      }))
-    : [];
-
-  const mappedTasks = Array.isArray(tasks)
-    ? tasks.map((item) => ({
-        id: item.id,
-        label: item.title || "Untitled task",
-        type: item.priority || "Task",
-        source: "task",
-      }))
-    : [];
-
-  const mappedHobbies = hobbies.map((item) => ({
-    id: item.id,
-    label: item.name || "Hobby",
-    type: item.type || "Hobby",
-    source: "hobby",
-  }));
-
-  linkItems = [...mappedProjects, ...mappedTasks, ...mappedHobbies];
+  linkItems = Core.links.loadLinkedItems(loadData, {
+    projects: STORAGE_KEY,
+    tasks: TASKS_KEY,
+    hobbies: HOBBIES_KEY,
+  });
 }
 
 function renderFormLinkedItems() {
@@ -267,15 +192,13 @@ function getSuggestionList(type, query) {
           (item) => item.source === "project" && String(item.type).toLowerCase() !== "learning"
         )
       : normalizedType === "learning"
-      ? linkItems.filter(
-          (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
-        )
-      : normalizedType === "task"
-      ? linkItems.filter((item) => item.source === "task")
-      : linkItems.filter((item) => item.source === "hobby");
-  return query
-    ? list.filter((item) => item.label.toLowerCase().includes(query))
-    : list;
+        ? linkItems.filter(
+            (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
+          )
+        : normalizedType === "task"
+          ? linkItems.filter((item) => item.source === "task")
+          : linkItems.filter((item) => item.source === "hobby");
+  return query ? list.filter((item) => item.label.toLowerCase().includes(query)) : list;
 }
 
 function handleFormSlashCommands() {
@@ -444,9 +367,32 @@ function getRange(items) {
   return { min: addHours(min, -12), max: addHours(max, 12) };
 }
 
+function readTerminalGanttTheme() {
+  const root = typeof document !== "undefined" ? document.documentElement : null;
+  const styles = root ? getComputedStyle(root) : null;
+  const pick = (name, fallback) => {
+    const value = styles ? String(styles.getPropertyValue(name) || "").trim() : "";
+    return value || fallback;
+  };
+  return {
+    background: pick("--panel", "#000000"),
+    header: "#021209",
+    grid: pick("--line-soft", "#0f3a20"),
+    axis: pick("--line", "#154d2a"),
+    text: pick("--text", "rgb(122, 250, 79)"),
+    muted: pick("--muted", "#6dc64f"),
+    project: "rgba(122,250,79,0.28)",
+    learning: "rgba(0,212,170,0.28)",
+    projectWork: "rgba(122,250,79,0.88)",
+    learningWork: "rgba(0,212,170,0.88)",
+    now: "#ff9f43",
+  };
+}
+
 function renderGantt() {
   const sorted = sortEntries(entries);
   const { min, max } = getRange(sorted);
+  const theme = readTerminalGanttTheme();
   const totalHours = Math.max(1, Math.ceil(hoursBetween(min, max)));
   const labelWidth = 180;
   const headerHeight = 28;
@@ -463,13 +409,13 @@ function renderGantt() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = theme.background;
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = "#f4efe9";
+  ctx.fillStyle = theme.header;
   ctx.fillRect(0, 0, width, headerHeight);
 
-  ctx.strokeStyle = "#e4dbd2";
+  ctx.strokeStyle = theme.axis;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(labelWidth, 0);
@@ -488,13 +434,13 @@ function renderGantt() {
     const isMonthStart = isMidnight && current.getDate() === 1;
 
     if (showHours) {
-      ctx.strokeStyle = "#f0e8df";
+      ctx.strokeStyle = theme.grid;
       ctx.beginPath();
       ctx.moveTo(x, headerHeight);
       ctx.lineTo(x, height);
       ctx.stroke();
     } else if (isMidnight) {
-      ctx.strokeStyle = isWeekStart ? "#d7cbbf" : "#eee7e0";
+      ctx.strokeStyle = isWeekStart ? theme.axis : theme.grid;
       ctx.beginPath();
       ctx.moveTo(x, headerHeight);
       ctx.lineTo(x, height);
@@ -502,15 +448,15 @@ function renderGantt() {
     }
 
     if (showHours && hour % 6 === 0) {
-      ctx.fillStyle = "#6a5f57";
-      ctx.font = "10px Palatino, serif";
+      ctx.fillStyle = theme.muted;
+      ctx.font = "10px Consolas, monospace";
       const label = current.toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
       });
       ctx.fillText(label, x + 2, 26);
       if (isMidnight) {
-        ctx.font = "11px Palatino, serif";
+        ctx.font = "11px Consolas, monospace";
         const dayLabel = current.toLocaleString("en-US", {
           month: "short",
           day: "numeric",
@@ -521,24 +467,24 @@ function renderGantt() {
     }
 
     if (!showHours && showDays && isMidnight && (isWeekStart || hour === 0)) {
-      ctx.fillStyle = "#6a5f57";
-      ctx.font = "12px Palatino, serif";
+      ctx.fillStyle = theme.muted;
+      ctx.font = "12px Consolas, monospace";
       const label = current.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
       });
       ctx.fillText(label, x + 4, 18);
     } else if (!showDays && showWeeks && isWeekStart) {
-      ctx.fillStyle = "#6a5f57";
-      ctx.font = "12px Palatino, serif";
+      ctx.fillStyle = theme.muted;
+      ctx.font = "12px Consolas, monospace";
       const weekLabel = current.toLocaleString("en-US", {
         month: "short",
         day: "numeric",
       });
       ctx.fillText(weekLabel, x + 4, 18);
     } else if (!showWeeks && isMonthStart) {
-      ctx.fillStyle = "#6a5f57";
-      ctx.font = "12px Palatino, serif";
+      ctx.fillStyle = theme.muted;
+      ctx.font = "12px Consolas, monospace";
       const monthLabel = current.toLocaleString("en-US", {
         month: "short",
         year: "numeric",
@@ -555,12 +501,11 @@ function renderGantt() {
     const xEnd = labelWidth + hoursBetween(min, end) * ganttZoom;
     const barHeight = Math.max(10, rowHeight * 0.6);
     const y = headerHeight + index * rowHeight + (rowHeight - barHeight) / 2;
-    const baseColor =
-      entry.type === "Learning" ? "rgba(76, 139, 217, 0.45)" : "rgba(225, 123, 80, 0.45)";
-    const workColor = entry.type === "Learning" ? "#1f4d8f" : "#8a3b1f";
+    const baseColor = entry.type === "Learning" ? theme.learning : theme.project;
+    const workColor = entry.type === "Learning" ? theme.learningWork : theme.projectWork;
 
-    ctx.fillStyle = "#1f1a17";
-    ctx.font = "13px Palatino, serif";
+    ctx.fillStyle = theme.text;
+    ctx.font = "13px Consolas, monospace";
     ctx.fillText(entry.title, 12, y + barHeight - 2);
 
     ctx.fillStyle = baseColor;
@@ -585,7 +530,7 @@ function renderGantt() {
   const now = new Date();
   if (now >= min && now <= max) {
     const x = labelWidth + hoursBetween(min, now) * ganttZoom;
-    ctx.strokeStyle = "#1f1a17";
+    ctx.strokeStyle = theme.now;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(x, headerHeight);
@@ -595,17 +540,11 @@ function renderGantt() {
 }
 
 function sortEntries(items) {
-  return [...items].sort((a, b) => {
-    const dateA = a.startDate || a.endDate || a.createdAt;
-    const dateB = b.startDate || b.endDate || b.createdAt;
-    if (dateA === dateB) return a.title.localeCompare(b.title);
-    return dateB.localeCompare(dateA);
-  });
+  return Core.projects.sortEntries(items);
 }
 
 function formatDuration(start, end) {
-  const hours = Math.max(0, (end - start) / MS_PER_HOUR);
-  return `${Math.round(hours * 100) / 100}h`;
+  return Core.projects.formatDuration(start, end);
 }
 
 function renderWorkList(entry) {
@@ -678,6 +617,8 @@ function renderEntries() {
     const showDelete = editingId === entry.id ? "" : "hidden";
     const tagValue = Array.isArray(entry.tags) ? entry.tags.join(", ") : "";
     const historyHtml = renderHistory(entry);
+    const calendarTime = normalizeCalendarTime(entry.calendarTime) || "--:--";
+    const calendarDuration = clampCalendarDuration(entry.calendarDurationMinutes || 60);
     item.innerHTML = `
       <div class="entry-header" data-id="${entry.id}">
         <div class="entry-title">
@@ -690,14 +631,12 @@ function renderEntries() {
         </div>
       </div>
       <div class="entry-meta">Start: ${entry.startDate || "--"} | End: ${
-      entry.endDate || "--"
-    }</div>
+        entry.endDate || "--"
+      } | Calendar: ${calendarTime} / ${calendarDuration}m</div>
       <div class="entry-details ${editingId === entry.id ? "" : "hidden"}" data-details="${entry.id}">
         <label class="field">
           <span>Notes</span>
-          <textarea data-notes="${entry.id}" rows="3">${
-      entry.notes ? entry.notes : ""
-    }</textarea>
+          <textarea data-notes="${entry.id}" rows="3">${entry.notes ? entry.notes : ""}</textarea>
         </label>
         <div class="suggestions" data-suggestions="${entry.id}"></div>
         <label class="field">
@@ -710,13 +649,22 @@ function renderEntries() {
         </div>
         <label class="field">
           <span>Links (comma separated)</span>
-          <input data-links="${entry.id}" type="text" value="${
-      entry.links ? entry.links : ""
-    }" />
+          <input data-links="${entry.id}" type="text" value="${entry.links ? entry.links : ""}" />
         </label>
         <div class="field">
           <span>Weekly schedule (adds to to-do)</span>
           <div class="week-row">${scheduleButtons}</div>
+        </div>
+        <div class="field">
+          <span>Calendar time (HH:MM) and duration</span>
+          <div class="entry-actions">
+            <input data-cal-time="${entry.id}" type="time" value="${
+              normalizeCalendarTime(entry.calendarTime) || "09:00"
+            }" />
+            <input data-cal-duration="${entry.id}" type="number" min="15" max="720" step="15" value="${
+              calendarDuration
+            }" />
+          </div>
         </div>
         <div class="field">
           <span>Add work segment</span>
@@ -729,9 +677,7 @@ function renderEntries() {
         </div>
         <label class="field">
           <span>Start date</span>
-          <input data-start="${entry.id}" type="date" value="${
-      entry.startDate || ""
-    }" />
+          <input data-start="${entry.id}" type="date" value="${entry.startDate || ""}" />
         </label>
         <label class="field">
           <span>End date</span>
@@ -791,6 +737,8 @@ function addEntry(event) {
     notes: notesInput.value.trim(),
     tags: parseTags(tagsInput.value),
     linkedItems: [...currentLinks],
+    calendarTime: "09:00",
+    calendarDurationMinutes: 60,
   };
 
   if (formEditingId) {
@@ -805,6 +753,11 @@ function addEntry(event) {
       existing.notes = updates.notes;
       existing.tags = updates.tags;
       existing.linkedItems = updates.linkedItems;
+      existing.calendarTime =
+        normalizeCalendarTime(existing.calendarTime || updates.calendarTime) || "09:00";
+      existing.calendarDurationMinutes = clampCalendarDuration(
+        existing.calendarDurationMinutes || updates.calendarDurationMinutes
+      );
       existing.updatedAt = new Date().toISOString();
     }
   } else {
@@ -818,6 +771,8 @@ function addEntry(event) {
       notes: updates.notes,
       tags: updates.tags,
       linkedItems: updates.linkedItems,
+      calendarTime: updates.calendarTime,
+      calendarDurationMinutes: updates.calendarDurationMinutes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       history: [],
@@ -895,6 +850,8 @@ entriesList.addEventListener("click", (event) => {
     const start = entriesList.querySelector(`[data-start="${entryId}"]`);
     const end = entriesList.querySelector(`[data-end="${entryId}"]`);
     const tags = entriesList.querySelector(`[data-tags="${entryId}"]`);
+    const calTime = entriesList.querySelector(`[data-cal-time="${entryId}"]`);
+    const calDuration = entriesList.querySelector(`[data-cal-duration="${entryId}"]`);
     const entry = entries.find((item) => item.id === entryId);
     if (entry) {
       const updates = {
@@ -903,6 +860,11 @@ entriesList.addEventListener("click", (event) => {
         startDate: start ? start.value : "",
         endDate: end ? end.value : "",
         tags: tags ? parseTags(tags.value) : [],
+        calendarTime:
+          normalizeCalendarTime(calTime ? calTime.value : entry.calendarTime) || "09:00",
+        calendarDurationMinutes: clampCalendarDuration(
+          calDuration ? calDuration.value : entry.calendarDurationMinutes
+        ),
       };
       trackChanges(entry, updates);
       entry.notes = updates.notes;
@@ -910,6 +872,8 @@ entriesList.addEventListener("click", (event) => {
       entry.startDate = updates.startDate;
       entry.endDate = updates.endDate;
       entry.tags = updates.tags;
+      entry.calendarTime = updates.calendarTime;
+      entry.calendarDurationMinutes = updates.calendarDurationMinutes;
       entry.updatedAt = new Date().toISOString();
       saveEntries();
       renderEntries();

@@ -1,0 +1,5 @@
+node_modules/
+.git/
+bitburner-src-dev/
+backup_pre_local_mode/
+user_data/

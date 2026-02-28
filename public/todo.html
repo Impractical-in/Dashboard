@@ -5,72 +5,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>To-Do List</title>
     <link rel="stylesheet" href="css/todo.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">To-Do List</div>
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
         <div class="subtitle">Priorities, due dates, and fast planning</div>
       </div>
-      <a class="btn ghost" href="index.html">Back to Home</a>
+      <div class="topbar-actions">
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+        <a class="btn ghost" href="index.html">Back to Home</a>
+      </div>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn is-active" href="todo.html" aria-current="page">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="stack">
       <section class="card collapsible-card" id="taskFormCard">
         <div class="card-header">
           <div class="section-title">Add a task</div>
-          <button class="btn icon" id="taskFormToggle" type="button" aria-expanded="false">+</button>
+          <button class="btn icon" id="taskFormToggle" type="button" aria-expanded="false">
+            +
+          </button>
         </div>
         <div class="collapsible collapsed" id="taskFormWrap">
           <form id="taskForm" class="form">
-          <label class="field">
-            <span>Task</span>
-            <input id="taskTitle" type="text" placeholder="What needs to be done?" required />
-          </label>
-          <label class="field">
-            <span>Priority</span>
-            <select id="taskPriority">
-              <option value="P1">P1 - Critical</option>
-              <option value="P2" selected>P2 - High</option>
-              <option value="P3">P3 - Medium</option>
-              <option value="P4">P4 - Low</option>
-            </select>
-          </label>
-          <label class="field color-field">
-            <span>Custom color (optional)</span>
-            <input id="taskColor" type="color" value="#3f88c5" />
-          </label>
-          <label class="field">
-            <span>Due date & time</span>
-            <input id="taskDue" type="datetime-local" />
-          </label>
-          <div class="quick-row">
-            <button class="btn" type="button" data-quick="today">Today</button>
-            <button class="btn" type="button" data-quick="tomorrow">Tomorrow</button>
-            <button class="btn" type="button" data-quick="nextweek">Next week</button>
-          </div>
-          <label class="field">
-            <span>Notes</span>
-            <textarea id="taskNotes" rows="3" placeholder="Optional details..."></textarea>
-          </label>
-          <div class="suggestions" id="taskSuggestions"></div>
-          <label class="field">
-            <span>Tags (comma separated)</span>
-            <input id="taskTags" type="text" placeholder="errands, deep work, calls" />
-          </label>
-          <label class="field">
-            <span>Checklist (one per line)</span>
-            <textarea id="taskChecklist" rows="3" placeholder="Step 1&#10;Step 2"></textarea>
-          </label>
-          <div class="field">
-            <span>Linked items</span>
-            <div id="taskLinkedItems" class="linked-items"></div>
-          </div>
-          <button class="btn primary" type="submit">Save task</button>
-          <div class="form-actions">
-            <button class="btn hidden" id="taskDelete" type="button">Delete task</button>
-            <button class="btn" id="taskCancel" type="button">Cancel edit</button>
-          </div>
+            <label class="field">
+              <span>Task</span>
+              <input id="taskTitle" type="text" placeholder="What needs to be done?" required />
+            </label>
+            <label class="field">
+              <span>Priority</span>
+              <select id="taskPriority">
+                <option value="P1">P1 - Critical</option>
+                <option value="P2" selected>P2 - High</option>
+                <option value="P3">P3 - Medium</option>
+                <option value="P4">P4 - Low</option>
+              </select>
+            </label>
+            <label class="field color-field">
+              <span>Custom color (optional)</span>
+              <input id="taskColor" type="color" value="#3f88c5" />
+            </label>
+            <label class="field">
+              <span>Due date & time</span>
+              <input id="taskDue" type="datetime-local" />
+            </label>
+            <div class="quick-row">
+              <button class="btn" type="button" data-quick="today">Today</button>
+              <button class="btn" type="button" data-quick="tomorrow">Tomorrow</button>
+              <button class="btn" type="button" data-quick="nextweek">Next week</button>
+            </div>
+            <label class="field">
+              <span>Notes</span>
+              <textarea id="taskNotes" rows="3" placeholder="Optional details..."></textarea>
+            </label>
+            <div class="suggestions" id="taskSuggestions"></div>
+            <label class="field">
+              <span>Tags (comma separated)</span>
+              <input id="taskTags" type="text" placeholder="errands, deep work, calls" />
+            </label>
+            <label class="field">
+              <span>Checklist (one per line)</span>
+              <textarea id="taskChecklist" rows="3" placeholder="Step 1&#10;Step 2"></textarea>
+            </label>
+            <div class="field">
+              <span>Linked items</span>
+              <div id="taskLinkedItems" class="linked-items"></div>
+            </div>
+            <button class="btn primary" type="submit">Save task</button>
+            <div class="form-actions">
+              <button class="btn hidden" id="taskDelete" type="button">Delete task</button>
+              <button class="btn" id="taskCancel" type="button">Cancel edit</button>
+            </div>
           </form>
         </div>
       </section>
@@ -79,9 +104,9 @@
         <div class="section-title">Your tasks</div>
         <div class="section-title">Scheduled for</div>
         <div class="schedule-row">
-          <button class="btn" id="prevScheduleDay" type="button">◀</button>
+          <button class="btn" id="prevScheduleDay" type="button">&lt;</button>
           <input id="scheduleDate" type="date" />
-          <button class="btn" id="nextScheduleDay" type="button">▶</button>
+          <button class="btn" id="nextScheduleDay" type="button">&gt;</button>
         </div>
         <div class="week-row" id="scheduleWeek"></div>
         <div class="schedule-list" id="scheduledList"></div>
@@ -105,13 +130,12 @@
         <div id="archiveList" class="task-list"></div>
       </section>
     </main>
+    <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
 
+    <script src="js/core/dashboard-core.js"></script>
     <script src="js/storage.js?v=20260215-local-v2"></script>
     <script src="js/todo.js?v=20260215-local-v2"></script>
-      <script src="js/agent-chat.js?v=20260215-local-v2"></script>
   </body>
 </html>
-
-
-
-

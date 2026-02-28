@@ -3,53 +3,71 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
-    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Settings & Backup</title>
     <link rel="stylesheet" href="css/sync.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Backup</div>
-        <div class="subtitle">Save snapshot or upload snapshot</div>
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
+        <div class="subtitle">Local-only snapshots (no server sync)</div>
       </div>
-      <a class="btn ghost" href="index.html">Back to Home</a>
+      <div class="topbar-actions">
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+        <a class="btn ghost" href="index.html">Back to Home</a>
+      </div>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn is-active" href="sync.html" aria-current="page">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="stack">
       <section class="card">
         <div class="section-title">1) Save Current Snapshot</div>
         <div class="row">
-          <label for="snapshotTarget">Save to</label>
-          <select id="snapshotTarget">
-            <option value="server">Server</option>
-            <option value="device">My Device</option>
-          </select>
+          <label>Target</label>
+          <div class="hint">My Device (.json)</div>
           <button class="btn primary" id="saveSnapshotBtn" type="button">Save Snapshot</button>
         </div>
-        <div class="hint">Filename format: <code>server_state_YYYYMMDD_HHMMSS.json</code></div>
+        <div class="hint">Filename format: <code>local_state_YYYYMMDD_HHMMSS.json</code></div>
       </section>
 
       <section class="card">
-        <div class="section-title">2) Upload Snapshot</div>
+        <div class="section-title">2) Restore From Snapshot</div>
         <div class="row">
           <input id="snapshotUploadInput" type="file" accept="application/json" />
-          <button class="btn" id="uploadSnapshotBtn" type="button">Upload Snapshot</button>
+          <button class="btn" id="uploadSnapshotBtn" type="button">Restore Snapshot</button>
         </div>
-        <div class="hint">Uploads selected JSON snapshot to server backup storage.</div>
+        <div class="hint">Loads selected snapshot into browser local storage.</div>
       </section>
 
       <section class="card">
         <div class="status" id="backupStatus">Ready.</div>
+        <div class="hint" id="backupHistory">No local backup saved yet.</div>
       </section>
     </main>
 
     <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/sync.js"></script>
-    <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-

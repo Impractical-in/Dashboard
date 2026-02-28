@@ -5,18 +5,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Calendar</title>
     <link rel="stylesheet" href="css/calendar.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Calendar</div>
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
         <div class="subtitle">Scheduled tasks, projects, and hobbies</div>
       </div>
       <div class="topbar-actions">
-        <button class="btn help-btn" id="helpToggleBtn" type="button" aria-haspopup="dialog" aria-controls="shortcutsPanel">?</button>
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+        <button
+          class="btn help-btn"
+          id="helpToggleBtn"
+          type="button"
+          aria-haspopup="dialog"
+          aria-controls="shortcutsPanel"
+        >
+          ?
+        </button>
         <a class="btn ghost" href="index.html">Back to Home</a>
       </div>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn is-active" href="calendar.html" aria-current="page">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="card">
       <div class="calendar-head">
@@ -40,7 +69,9 @@
       <section class="quick-add card-lite" aria-label="Quick add tasks">
         <div class="quick-add-head">
           <div class="section-title">Quick Add</div>
-          <div class="detail-meta">Create a task, project, or learning plan directly from calendar.</div>
+          <div class="detail-meta">
+            Create a task, project, or learning plan directly from calendar.
+          </div>
         </div>
         <form id="quickAddForm" class="quick-add-form">
           <select id="quickEntryType">
@@ -95,30 +126,38 @@
       <div id="dayDetails" class="day-details"></div>
     </section>
 
-    <div id="shortcutsPanel" class="shortcuts-panel hidden" role="dialog" aria-modal="true" aria-label="Calendar shortcuts">
+    <div
+      id="shortcutsPanel"
+      class="shortcuts-panel hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Calendar shortcuts"
+    >
       <div class="shortcuts-card">
         <div class="shortcuts-head">
           <div class="section-title">Calendar Shortcuts</div>
           <button id="shortcutsCloseBtn" class="btn" type="button">Close</button>
         </div>
         <div class="shortcuts-list">
-          <div><strong>Drag</strong>: move task to another day/time slot.</div>
+          <div><strong>Drag</strong>: move task/project to another day/time slot.</div>
           <div><strong>Resize bottom edge</strong>: increase/decrease task duration.</div>
           <div><strong>Alt/Ctrl + Drop</strong>: copy task to target day/time.</div>
-          <div><strong>Double-click</strong>: open origin task in To-Do.</div>
-          <div><strong>Shift + Double-click</strong>: span task across multiple days (linked series).</div>
+          <div><strong>Double-click</strong>: open origin task in To-Do or project entry.</div>
+          <div>
+            <strong>Shift + Double-click</strong>: span task across multiple days (linked series).
+          </div>
           <div><strong>Right-click</strong>: delete one occurrence or entire linked series.</div>
-          <div><strong>Linked series</strong>: moving/resizing one occurrence updates all in series.</div>
+          <div>
+            <strong>Linked series</strong>: moving/resizing one occurrence updates all in series.
+          </div>
         </div>
       </div>
     </div>
+    <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
 
     <script src="js/storage.js?v=0.2.2"></script>
     <script src="js/calendar.js?v=20260215-local-v21"></script>
-    <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-

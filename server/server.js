@@ -2,6 +2,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const versions = require(path.join(__dirname, "..", "public", "js", "version.js"));
+const { applySecurityHeaders } = require(path.join(__dirname, "lib", "security-headers"));
+const { validateStatePayload } = require(path.join(__dirname, "lib", "state-contract"));
 
 const PORT = process.env.PORT || 8080;
 const PUBLIC_DIR = path.join(__dirname, "..", "public");
@@ -27,6 +29,9 @@ const AGENT_PROMPT_CONTEXT_LIMIT = Math.max(
 const AGENT_MAX_PREDICT = Math.max(32, Number(process.env.DASHBOARD_AGENT_MAX_PREDICT || 160));
 const AGENT_KEEP_ALIVE = process.env.DASHBOARD_AGENT_KEEP_ALIVE || "30m";
 const AGENT_RETRIEVAL_ITEM_LIMIT = Math.max(5, Number(process.env.DASHBOARD_AGENT_RETRIEVAL_ITEM_LIMIT || 20));
+const AGENT_RUNTIME_INTERVAL_MS = Math.max(1500, Number(process.env.DASHBOARD_AGENT_RUNTIME_INTERVAL_MS || 3000));
+const AGENT_RUNTIME_MAX_ATTEMPTS = Math.max(2, Number(process.env.DASHBOARD_AGENT_RUNTIME_MAX_ATTEMPTS || 8));
+const AGENT_RUNTIME_LOG_LIMIT = Math.max(40, Number(process.env.DASHBOARD_AGENT_RUNTIME_LOG_LIMIT || 180));
 
 function getOllamaBases() {
   const bases = [
@@ -596,6 +601,347 @@ function buildAgentContextForQuestion(question) {
   });
 }
 
+const agentRuntime = {
+  status: "idle",
+  maintenance: false,
+  queue: [],
+  currentTask: null,
+  completed: [],
+  logs: [],
+  nextTaskId: 1,
+  nextLogId: 1,
+  runnerBusy: false,
+  timer: null,
+  lastError: "",
+  lastTickAt: null,
+  lastModelCheckAt: null,
+  modelAvailable: null,
+};
+
+function parseJsonFromText(text) {
+  const source = String(text || "").trim();
+  if (!source) return null;
+  try {
+    return JSON.parse(source);
+  } catch (_) {
+    const start = source.indexOf("{");
+    const end = source.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(source.slice(start, end + 1));
+      } catch (_err) {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function pushRuntimeLog(kind, text) {
+  agentRuntime.logs.push({
+    id: agentRuntime.nextLogId++,
+    kind: String(kind || "system"),
+    text: String(text || ""),
+    at: new Date().toISOString(),
+  });
+  if (agentRuntime.logs.length > AGENT_RUNTIME_LOG_LIMIT) {
+    agentRuntime.logs = agentRuntime.logs.slice(-AGENT_RUNTIME_LOG_LIMIT);
+  }
+}
+
+function runtimeStatus() {
+  if (agentRuntime.maintenance) return "maintenance";
+  if (agentRuntime.currentTask) return "working";
+  if (agentRuntime.queue.length > 0) return "working";
+  if (agentRuntime.lastError) return "error";
+  return "idle";
+}
+
+function runtimeSnapshot() {
+  return {
+    status: runtimeStatus(),
+    maintenance: Boolean(agentRuntime.maintenance),
+    queueLength: agentRuntime.queue.length,
+    model: AGENT_MODEL,
+    modelAvailable: agentRuntime.modelAvailable,
+    lastError: agentRuntime.lastError || null,
+    lastTickAt: agentRuntime.lastTickAt,
+    currentTask: agentRuntime.currentTask
+      ? {
+        id: agentRuntime.currentTask.id,
+        text: agentRuntime.currentTask.text,
+        attempts: agentRuntime.currentTask.attempts,
+        maxAttempts: agentRuntime.currentTask.maxAttempts,
+        createdAt: agentRuntime.currentTask.createdAt,
+      }
+      : null,
+    completed: agentRuntime.completed.slice(-8),
+    logs: agentRuntime.logs.slice(-25),
+  };
+}
+
+function enqueueRuntimeTask(text, source) {
+  const taskText = String(text || "").trim();
+  if (!taskText) return null;
+  const task = {
+    id: `T${String(agentRuntime.nextTaskId++).padStart(4, "0")}`,
+    text: taskText,
+    source: String(source || "manual"),
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+    maxAttempts: AGENT_RUNTIME_MAX_ATTEMPTS,
+    lastSummary: "",
+  };
+  agentRuntime.queue.push(task);
+  pushRuntimeLog("system", `Queued ${task.id}: ${task.text}`);
+  return task;
+}
+
+async function checkAgentModelAvailability() {
+  try {
+    const { response } = await fetchFromOllama("/api/tags");
+    if (!response.ok) {
+      agentRuntime.modelAvailable = false;
+      return false;
+    }
+    const payload = await response.json();
+    const modelNames = Array.isArray(payload.models) ? payload.models.map((m) => m.name) : [];
+    const available = modelNames.includes(AGENT_MODEL);
+    agentRuntime.modelAvailable = available;
+    agentRuntime.lastModelCheckAt = new Date().toISOString();
+    return available;
+  } catch (_err) {
+    agentRuntime.modelAvailable = false;
+    agentRuntime.lastModelCheckAt = new Date().toISOString();
+    return false;
+  }
+}
+
+async function runAgentChat(question) {
+  const query = String(question || "").trim();
+  if (!query) {
+    const err = new Error("missing_question");
+    err.statusCode = 400;
+    throw err;
+  }
+  const context = buildAgentContextForQuestion(query);
+
+  const systemPrompt =
+    "You are a local assistant for a personal dashboard. You have read-only access to dashboard context. " +
+    "Never claim to modify files, server state, or tasks directly. Provide guidance only. " +
+    "Use the provided dashboard context first, including user_name.json profile and server_state backup snapshot. " +
+    "Be concise and actionable. Keep answers under 6 short bullet points unless asked for detail. " +
+    "If data is missing, say what is missing.";
+
+  const contextVariants = [
+    JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
+    JSON.stringify({ generatedAt: new Date().toISOString(), page: context.page || "", data: {} }),
+  ];
+
+  let lastError = null;
+  for (let attempt = 0; attempt < contextVariants.length; attempt += 1) {
+    const attemptTimeout = attempt === 0 ? AGENT_TIMEOUT_MS : Math.max(AGENT_TIMEOUT_MS, 120000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), attemptTimeout);
+    const userPrompt = [
+      "Dashboard context JSON:",
+      contextVariants[attempt],
+      "",
+      `Question: ${query}`,
+    ].join("\n");
+
+    try {
+      const { response, base } = await fetchFromOllama("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: AGENT_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          stream: false,
+          keep_alive: AGENT_KEEP_ALIVE,
+          options: {
+            num_predict: AGENT_MAX_PREDICT,
+          },
+        }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const body = await response.text();
+        const err = new Error(truncateString(body || "Ollama returned an error", 400));
+        err.statusCode = 502;
+        throw err;
+      }
+
+      const result = await response.json();
+      const reply = result && result.message && result.message.content ? result.message.content : "";
+      if (!reply) {
+        lastError = new Error("empty_reply");
+        continue;
+      }
+      return {
+        reply,
+        model: AGENT_MODEL,
+        source: "ollama",
+        base,
+        agentVersion: AGENT_VERSION,
+        attempt: attempt + 1,
+      };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastError = err;
+      if (!(err && err.name === "AbortError")) break;
+    }
+  }
+
+  if (lastError && lastError.name === "AbortError") {
+    const timeoutError = new Error(`Agent timed out after retries. Base timeout ${AGENT_TIMEOUT_MS}ms.`);
+    timeoutError.statusCode = 504;
+    throw timeoutError;
+  }
+
+  const generic = new Error(
+    lastError && lastError.message
+      ? truncateString(lastError.message, 400)
+      : "Ollama reachable check failed"
+  );
+  generic.statusCode = 502;
+  throw generic;
+}
+
+async function executeRuntimeTaskRound(task) {
+  const available = await checkAgentModelAvailability();
+  if (!available) {
+    return {
+      done: false,
+      summary: `Model ${AGENT_MODEL} is not available in Ollama.`,
+      nextStep: `Run: ollama pull ${AGENT_MODEL}`,
+      blocked: true,
+    };
+  }
+
+  const prompt = [
+    "You are an autonomous task executor for a dashboard agent runtime.",
+    "You do not have filesystem write access. Think and report only.",
+    "Return strict JSON only:",
+    '{"done": boolean, "summary": "string", "nextStep": "string"}',
+    "",
+    `Task: ${task.text}`,
+    `Attempt: ${task.attempts}/${task.maxAttempts}`,
+    task.lastSummary ? `Previous summary: ${task.lastSummary}` : "",
+    "",
+    "If completed, set done=true and provide concise summary.",
+    "If not completed, set done=false and provide specific nextStep.",
+  ].filter(Boolean).join("\n");
+
+  const { response } = await fetchFromOllama("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: AGENT_MODEL,
+      stream: false,
+      keep_alive: AGENT_KEEP_ALIVE,
+      messages: [
+        {
+          role: "system",
+          content: "Return valid JSON only. Never include markdown fences.",
+        },
+        { role: "user", content: prompt },
+      ],
+      options: {
+        num_predict: Math.max(96, AGENT_MAX_PREDICT),
+        temperature: 0.2,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || "runtime_task_round_failed");
+  }
+
+  const result = await response.json();
+  const content = result && result.message && result.message.content ? result.message.content : "";
+  const parsed = parseJsonFromText(content) || {};
+  return {
+    done: Boolean(parsed.done),
+    summary: String(parsed.summary || content || "").trim(),
+    nextStep: String(parsed.nextStep || "").trim(),
+    blocked: false,
+  };
+}
+
+async function processRuntimeQueue() {
+  if (agentRuntime.runnerBusy) return;
+  agentRuntime.runnerBusy = true;
+  agentRuntime.lastTickAt = new Date().toISOString();
+
+  try {
+    if (agentRuntime.maintenance || agentRuntime.currentTask) return;
+    const task = agentRuntime.queue.shift();
+    if (!task) {
+      agentRuntime.lastError = "";
+      return;
+    }
+
+    agentRuntime.currentTask = task;
+    task.attempts += 1;
+    agentRuntime.lastError = "";
+    pushRuntimeLog("system", `Working on ${task.id} (attempt ${task.attempts}/${task.maxAttempts})`);
+
+    const result = await executeRuntimeTaskRound(task);
+    task.lastSummary = result.summary;
+
+    if (result.done) {
+      const completedAt = new Date().toISOString();
+      agentRuntime.completed.push({
+        id: task.id,
+        text: task.text,
+        completedAt,
+        summary: result.summary,
+      });
+      agentRuntime.completed = agentRuntime.completed.slice(-40);
+      pushRuntimeLog("system", `Completed ${task.id}: ${result.summary || "done"}`);
+    } else if (result.blocked) {
+      pushRuntimeLog("error", `Blocked ${task.id}: ${result.summary}`);
+      if (result.nextStep) pushRuntimeLog("system", result.nextStep);
+      if (task.attempts < task.maxAttempts && !agentRuntime.maintenance) {
+        agentRuntime.queue.unshift(task);
+      }
+    } else if (task.attempts >= task.maxAttempts) {
+      pushRuntimeLog("error", `Stopped ${task.id} after ${task.attempts} attempts: ${result.summary || "no completion"}`);
+    } else {
+      const note = result.nextStep || result.summary || "Continuing next round.";
+      pushRuntimeLog("system", `${task.id} continuing: ${note}`);
+      agentRuntime.queue.unshift(task);
+    }
+  } catch (err) {
+    const detail = err && err.message ? truncateString(err.message, 240) : "runtime_failure";
+    agentRuntime.lastError = detail;
+    pushRuntimeLog("error", `Runtime error: ${detail}`);
+  } finally {
+    agentRuntime.currentTask = null;
+    agentRuntime.runnerBusy = false;
+  }
+}
+
+function startRuntimeLoop() {
+  if (agentRuntime.timer) return;
+  agentRuntime.timer = setInterval(() => {
+    processRuntimeQueue().catch(() => {});
+  }, AGENT_RUNTIME_INTERVAL_MS);
+}
+
+function stopRuntimeLoop() {
+  if (!agentRuntime.timer) return;
+  clearInterval(agentRuntime.timer);
+  agentRuntime.timer = null;
+}
+
 function getContentType(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".html") return "text/html; charset=utf-8";
@@ -629,6 +975,7 @@ function serveStatic(req, res) {
 
 const server = http.createServer(async (req, res) => {
   const pathname = req.url.split("?")[0];
+  applySecurityHeaders(res);
 
   if (pathname.startsWith("/api/")) {
     res.setHeader("Access-Control-Allow-Origin", "*");
@@ -654,9 +1001,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
-      const data = extractStateData(payload);
-      if (!data) return send(res, 400, { error: "invalid_state" });
-      saveServerState(data);
+      const validated = validateStatePayload(payload);
+      if (!validated.ok) return send(res, 400, { error: validated.error });
+      saveServerState(validated.data);
       return send(res, 200, { ok: true });
     } catch (err) {
       return send(res, 400, { error: "invalid_payload" });
@@ -705,6 +1052,8 @@ const server = http.createServer(async (req, res) => {
       const payload = await response.json();
       const modelNames = Array.isArray(payload.models) ? payload.models.map((m) => m.name) : [];
       const modelAvailable = modelNames.includes(AGENT_MODEL);
+      agentRuntime.modelAvailable = modelAvailable;
+      agentRuntime.lastModelCheckAt = new Date().toISOString();
       return send(res, 200, {
         ok: true,
         agentVersion: AGENT_VERSION,
@@ -722,100 +1071,127 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  if (pathname === "/api/agent/runtime" && req.method === "GET") {
+    return send(res, 200, runtimeSnapshot());
+  }
+
+  if (pathname === "/api/agent/runtime/task" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      const payload = raw ? JSON.parse(raw) : {};
+      const task = enqueueRuntimeTask(payload.task, "api");
+      if (!task) return send(res, 400, { error: "missing_task" });
+      processRuntimeQueue().catch(() => {});
+      return send(res, 200, { ok: true, taskId: task.id, queueLength: agentRuntime.queue.length });
+    } catch (err) {
+      return send(res, 400, { error: "invalid_payload" });
+    }
+  }
+
+  if (pathname === "/api/agent/runtime/maintenance" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      const payload = raw ? JSON.parse(raw) : {};
+      agentRuntime.maintenance = Boolean(payload.enabled);
+      agentRuntime.lastError = "";
+      pushRuntimeLog(
+        "system",
+        agentRuntime.maintenance ? "Maintenance mode enabled." : "Maintenance mode disabled."
+      );
+      if (!agentRuntime.maintenance) {
+        processRuntimeQueue().catch(() => {});
+      }
+      return send(res, 200, { ok: true, maintenance: agentRuntime.maintenance, status: runtimeStatus() });
+    } catch (err) {
+      return send(res, 400, { error: "invalid_payload" });
+    }
+  }
+
+  if (pathname === "/api/agent/runtime/command" && req.method === "POST") {
+    try {
+      const raw = await readBody(req);
+      const payload = raw ? JSON.parse(raw) : {};
+      const input = String(payload.input || "").trim();
+      if (!input) return send(res, 400, { error: "missing_input" });
+
+      const lower = input.toLowerCase();
+      if (lower === "/help") {
+        return send(res, 200, {
+          lines: [
+            { kind: "system", text: "Commands: /help, /status, /maintenance on|off, /assign <task>, /logs" },
+          ],
+        });
+      }
+
+      if (lower === "/status") {
+        const snap = runtimeSnapshot();
+        const summary = [
+          `Status: ${snap.status.toUpperCase()}`,
+          `Queue: ${snap.queueLength}`,
+          `Maintenance: ${snap.maintenance ? "on" : "off"}`,
+          snap.currentTask ? `Active: ${snap.currentTask.text}` : "Active: none",
+        ].join(" | ");
+        return send(res, 200, { lines: [{ kind: "system", text: summary }] });
+      }
+
+      if (lower === "/logs") {
+        return send(res, 200, {
+          lines: agentRuntime.logs.slice(-8).map((entry) => ({
+            kind: entry.kind,
+            text: entry.text,
+            at: entry.at,
+          })),
+        });
+      }
+
+      if (lower.startsWith("/maintenance")) {
+        const enabled = /\bon\b/.test(lower);
+        const disabled = /\boff\b/.test(lower);
+        if (!enabled && !disabled) {
+          return send(res, 200, { lines: [{ kind: "system", text: "Usage: /maintenance on|off" }] });
+        }
+        agentRuntime.maintenance = enabled;
+        pushRuntimeLog("system", enabled ? "Maintenance mode enabled." : "Maintenance mode disabled.");
+        if (!enabled) processRuntimeQueue().catch(() => {});
+        return send(res, 200, {
+          lines: [{ kind: "system", text: enabled ? "Maintenance enabled." : "Maintenance disabled." }],
+        });
+      }
+
+      if (lower.startsWith("/assign")) {
+        const taskText = input.replace(/^\/assign\s*/i, "").trim();
+        if (!taskText) {
+          return send(res, 200, { lines: [{ kind: "system", text: "Usage: /assign <task>" }] });
+        }
+        const task = enqueueRuntimeTask(taskText, "terminal");
+        processRuntimeQueue().catch(() => {});
+        return send(res, 200, {
+          lines: [{ kind: "system", text: `Queued ${task.id}: ${task.text}` }],
+        });
+      }
+
+      const chat = await runAgentChat(input);
+      return send(res, 200, {
+        lines: [{ kind: "system", text: String(chat.reply || "") }],
+      });
+    } catch (err) {
+      return send(res, 502, {
+        error: "command_failed",
+        detail: err && err.message ? truncateString(err.message, 300) : "unavailable",
+      });
+    }
+  }
+
   if (pathname === "/api/agent/chat" && req.method === "POST") {
     try {
       const raw = await readBody(req);
       const payload = raw ? JSON.parse(raw) : {};
       const question = String(payload.question || "").trim();
-      if (!question) return send(res, 400, { error: "missing_question" });
-      const context = buildAgentContextForQuestion(question);
-
-      const systemPrompt =
-        "You are a local assistant for a personal dashboard. You have read-only access to dashboard context. " +
-        "Never claim to modify files, server state, or tasks directly. Provide guidance only. " +
-        "Use the provided dashboard context first, including user_name.json profile and server_state backup snapshot. " +
-        "Be concise and actionable. Keep answers under 6 short bullet points unless asked for detail. " +
-        "If data is missing, say what is missing.";
-
-      const contextVariants = [
-        JSON.stringify(context).slice(0, AGENT_PROMPT_CONTEXT_LIMIT),
-        JSON.stringify({ generatedAt: new Date().toISOString(), page: context.page || "", data: {} }),
-      ];
-
-      let lastError = null;
-      for (let attempt = 0; attempt < contextVariants.length; attempt += 1) {
-        const attemptTimeout = attempt === 0 ? AGENT_TIMEOUT_MS : Math.max(AGENT_TIMEOUT_MS, 120000);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), attemptTimeout);
-        const userPrompt = [
-          "Dashboard context JSON:",
-          contextVariants[attempt],
-          "",
-          `Question: ${question}`,
-        ].join("\n");
-
-        try {
-          const { response, base } = await fetchFromOllama("/api/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: AGENT_MODEL,
-              messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
-              ],
-              stream: false,
-              keep_alive: AGENT_KEEP_ALIVE,
-              options: {
-                num_predict: AGENT_MAX_PREDICT,
-              },
-            }),
-            signal: controller.signal,
-          });
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const body = await response.text();
-            return send(res, 502, {
-              error: "agent_unavailable",
-              detail: truncateString(body || "Ollama returned an error", 400),
-              agentVersion: AGENT_VERSION,
-            });
-          }
-
-          const result = await response.json();
-          const reply = result && result.message && result.message.content ? result.message.content : "";
-          if (!reply) {
-            lastError = new Error("empty_reply");
-            continue;
-          }
-          return send(res, 200, {
-            reply,
-            model: AGENT_MODEL,
-            source: "ollama",
-            base,
-            agentVersion: AGENT_VERSION,
-            attempt: attempt + 1,
-          });
-        } catch (err) {
-          clearTimeout(timeoutId);
-          lastError = err;
-          if (!(err && err.name === "AbortError")) {
-            break;
-          }
-        }
-      }
-
-      if (lastError && lastError.name === "AbortError") {
-        return send(res, 504, {
-          error: "agent_timeout",
-          detail: `Agent timed out after retries. Base timeout ${AGENT_TIMEOUT_MS}ms.`,
-          agentVersion: AGENT_VERSION,
-        });
-      }
-      throw lastError || new Error("agent_failed");
+      const result = await runAgentChat(question);
+      return send(res, 200, result);
     } catch (err) {
-      return send(res, 502, {
+      const statusCode = Number(err && err.statusCode) || 502;
+      return send(res, statusCode, {
         error: "agent_unavailable",
         agentVersion: AGENT_VERSION,
         detail: err && err.message
@@ -828,6 +1204,8 @@ const server = http.createServer(async (req, res) => {
   if (serveStatic(req, res)) return;
   send(res, 404, { error: "not_found" });
 });
+
+startRuntimeLoop();
 
 server.listen(PORT, () => {
   console.log(`Dashboard server running on http://0.0.0.0:${PORT}`);

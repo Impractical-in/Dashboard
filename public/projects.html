@@ -3,65 +3,93 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
-    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Projects + Learning</title>
     <link rel="stylesheet" href="css/projects.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Projects + Learning</div>
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
         <div class="subtitle">Plan, track, and keep notes in one view</div>
       </div>
-      <a class="btn ghost" href="index.html">Back to Home</a>
+      <div class="topbar-actions">
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+        <a class="btn ghost" href="index.html">Back to Home</a>
+      </div>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn is-active" href="projects.html" aria-current="page">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="stack">
       <section class="card collapsible-card">
         <div class="card-header">
           <div class="section-title">Add a new entry</div>
-          <button class="btn icon" id="entryFormToggle" type="button" aria-expanded="false">+</button>
+          <button class="btn icon" id="entryFormToggle" type="button" aria-expanded="false">
+            +
+          </button>
         </div>
         <div class="collapsible collapsed" id="entryFormWrap">
           <form id="entryForm" class="form">
-          <label class="field">
-            <span>Type</span>
-            <select id="entryType">
-              <option value="Project">Project</option>
-              <option value="Learning">Learning</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Title</span>
-            <input id="entryTitle" type="text" placeholder="Name of the project or topic" required />
-          </label>
-          <label class="field">
-            <span>Start date</span>
-            <input id="entryStart" type="date" required />
-          </label>
-          <label class="field">
-            <span>End date</span>
-            <input id="entryEnd" type="date" />
-          </label>
-          <label class="field">
-            <span>Links (comma separated)</span>
-            <input id="entryLinks" type="text" placeholder="https://..., https://..." />
-          </label>
-          <label class="field">
-            <span>Notes</span>
-            <textarea id="entryNotes" rows="4" placeholder="What is this about?"></textarea>
-          </label>
-          <div class="suggestions" id="entrySuggestions"></div>
-          <label class="field">
-            <span>Tags (comma separated)</span>
-            <input id="entryTags" type="text" placeholder="research, roadmap, practice" />
-          </label>
-          <div class="field">
-            <span>Linked items</span>
-            <div id="entryLinkedItems" class="linked-items"></div>
-          </div>
-          <button class="btn primary" id="entrySubmitBtn" type="submit">Add entry</button>
+            <label class="field">
+              <span>Type</span>
+              <select id="entryType">
+                <option value="Project">Project</option>
+                <option value="Learning">Learning</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Title</span>
+              <input
+                id="entryTitle"
+                type="text"
+                placeholder="Name of the project or topic"
+                required
+              />
+            </label>
+            <label class="field">
+              <span>Start date</span>
+              <input id="entryStart" type="date" required />
+            </label>
+            <label class="field">
+              <span>End date</span>
+              <input id="entryEnd" type="date" />
+            </label>
+            <label class="field">
+              <span>Links (comma separated)</span>
+              <input id="entryLinks" type="text" placeholder="https://..., https://..." />
+            </label>
+            <label class="field">
+              <span>Notes</span>
+              <textarea id="entryNotes" rows="4" placeholder="What is this about?"></textarea>
+            </label>
+            <div class="suggestions" id="entrySuggestions"></div>
+            <label class="field">
+              <span>Tags (comma separated)</span>
+              <input id="entryTags" type="text" placeholder="research, roadmap, practice" />
+            </label>
+            <div class="field">
+              <span>Linked items</span>
+              <div id="entryLinkedItems" class="linked-items"></div>
+            </div>
+            <button class="btn primary" id="entrySubmitBtn" type="submit">Add entry</button>
           </form>
         </div>
       </section>
@@ -87,12 +115,12 @@
         </div>
       </section>
     </main>
+    <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
 
+    <script src="js/core/dashboard-core.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/projects.js"></script>
-      <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-

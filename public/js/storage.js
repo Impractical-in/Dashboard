@@ -21,9 +21,7 @@ let serverPullInFlight = false;
 const dirtyStateKeys = new Set();
 
 function canUseServerStateSync() {
-  if (typeof window === "undefined" || !window.location) return false;
-  const protocol = String(window.location.protocol || "").toLowerCase();
-  return protocol === "http:" || protocol === "https:";
+  return false;
 }
 
 if (typeof window !== "undefined") {
@@ -328,12 +326,7 @@ function queueServerPush() {
 }
 
 async function pullStateFromServer() {
-  if (
-    serverPullInFlight ||
-    !storageReady ||
-    suppressServerPush ||
-    !canUseServerStateSync()
-  ) {
+  if (serverPullInFlight || !storageReady || suppressServerPush || !canUseServerStateSync()) {
     return;
   }
   serverPullInFlight = true;

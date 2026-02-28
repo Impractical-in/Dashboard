@@ -71,10 +71,7 @@
     const origin = window.location.origin;
     const hostname = window.location.hostname;
     const isHttpOrigin = /^https?:\/\//i.test(origin);
-    const isLocalHost =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1";
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
 
     if (isHttpOrigin && !isLocalHost) {
       return [origin];
@@ -141,7 +138,10 @@
     panel.classList.toggle("open");
     if (panel.classList.contains("open")) {
       if (!log.children.length) {
-        pushMessage("bot", `Local agent ready (${agentVersion}). I answer from server-side read-only context.`);
+        pushMessage(
+          "bot",
+          `Local agent ready (${agentVersion}). I answer from server-side read-only context.`
+        );
       }
       checkAgentHealth().then((text) => {
         pushMessage("bot", text);

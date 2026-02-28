@@ -1,63 +1,134 @@
 # Local Dashboard
 
-A lightweight personal dashboard to track tasks, projects, journaling, habits, and focus sessions.
+Terminal-style personal dashboard for tasks, projects, calendar, journaling, hobbies, links, and backups.
 
-## Versions
-- Single source of truth: `public/js/version.js`
-- Dashboard and Agent versions are read from that file by both UI and server.
+## What this repo contains
 
-## Features
-- Home overview with quick access
-- To-do list with priorities and due dates
-- Projects + learning tracker
-- Journal with tags and links
-- Calendar view of tasks and schedules
-- Hobbies tracker with streaks
-- Pomodoro timer
-- Server-first state sync (`/api/state`) as source of truth
-- Settings & Backup page:
-  - local snapshot export/import
-  - server backup list + one-click restore
-  - upload backup JSON to server from any device
+- `public/`: static frontend pages and browser-side logic
+- `server/`: optional Node server for hosting + state APIs
+- `script_test/`: Windows scripts to start/stop full local stack
+- `user_data/`: server-side persisted state and backup snapshots
 
-## Local Agent Chat (Optional)
-You can run a local AI chat assistant with dashboard context and open it from the bottom-right chat button.
+## Runtime modes
 
-1. Install and run Ollama locally (`http://127.0.0.1:11434`).
-2. Pull a model (example): `ollama pull llama3.2:3b`
-3. Start dashboard server:
-   - `node server/server.js`
-4. Open any dashboard page and click the `AI` chat button.
+- Local mode (default): browser-local state, no server required
+- Server mode (optional): `/api/state` endpoints provide shared state
+- Future hosted mode (planned): Google-backed storage as canonical truth, with local/server cache
 
-Optional model override:
-- PowerShell: `$env:DASHBOARD_AGENT_MODEL="llama3.2:3b"`
+## Prerequisites
 
-## Script Runtime (`script_test`)
-If you want the app launched like a local machine script (browser UI + script-managed backend):
+- Node.js `>=20`
+- npm `>=10`
+- (Optional) Ollama for local AI endpoints
 
-- Start: `./script_test/start.ps1 -OpenBrowser -ForceRestart`
-- Stop: `./script_test/stop.ps1`
+## Quick start (local mode)
 
-Use port `8080` to keep the same existing browser data origin (`localhost:8080`).
+1. Install dependencies:
+   - `npm install`
+2. Verify project quality gates:
+   - `npm run verify`
+3. Start server (optional for static hosting/API):
+   - `npm start`
+4. Open:
+   - `http://localhost:8080`
 
-## Fresh Machine (Git Clone) Setup
-If you clone this repo on another machine and want the same runtime behavior:
+If you run local-only from filesystem (`file://`), core UI still works with browser storage.
 
-1. Install Node.js.
-2. Install Ollama.
-3. Run:
-   - `ollama pull llama3.2:3b`
-4. Start stack:
-   - `./script_test/start.ps1 -OpenBrowser -ForceRestart`
+## Scripted full runtime (Windows)
 
-The launcher will:
-- start/verify Ollama,
-- start dashboard server,
-- print local + LAN URLs.
+- Start:
+  - `./script_test/start.ps1 -OpenBrowser -ForceRestart`
+- Stop:
+  - `./script_test/stop.ps1`
 
-## Data & Backups
-- Active app state is persisted on server in `user_data/server_state.json`.
-- Great-delta backups are stored in:
-  - `user_data/state_backups`
-  - `user_data/backup_backup/state_backups`
-- Each backup location keeps the latest 10 files.
+## Feature list
+
+- Dashboard home with module previews
+- To-do with priority and due date handling
+- Projects + learning entries with Gantt timeline
+- Calendar month/week views with drag/resize
+- Journal and hobbies tracking
+- Local backup export/restore
+
+## Versioning
+
+- Canonical version is `package.json`
+- `public/js/version.js` is synchronized by:
+  - `npm run version:sync`
+- CI enforces consistency via:
+  - `npm run version:check`
+- Bump commands:
+  - `npm run version:bump:patch`
+  - each bump also syncs `public/js/version.js` and prepends `docs/changelog.md`
+
+## Quality tooling
+
+- Lint: `npm run lint`
+- Tests: `npm test`
+- Format check: `npm run format:check`
+- Full gate: `npm run verify`
+- CI workflow: `.github/workflows/ci.yml`
+
+## Security baseline
+
+- Security headers applied by server
+- Payload size + JSON-safe payload validation for state endpoints
+- Security workflow:
+  - CodeQL analysis
+  - npm audit (prod dependencies)
+
+See [Security Policy](docs/SECURITY.md).
+
+## API contract (current)
+
+### `GET /api/state`
+
+Returns:
+
+```json
+{ "version": 1, "data": { "...": "..." } }
+```
+
+### `POST /api/state`
+
+Accepts either:
+
+```json
+{ "version": 1, "updatedAt": "ISO_TIMESTAMP", "data": { "...": "..." } }
+```
+
+or direct object payload (backward compatibility).
+
+### Backups
+
+- `GET /api/state/backups`
+- `POST /api/state/backups/upload`
+- `POST /api/state/backups/restore`
+
+## Environment variables
+
+- `PORT` (default `8080`)
+- `DASHBOARD_AGENT_MODEL`
+- `OLLAMA_BASE_URL`
+- `DASHBOARD_AGENT_TIMEOUT_MS`
+- `DASHBOARD_AGENT_MAX_PREDICT`
+
+## Troubleshooting
+
+- Port in use: run server on alternate port (`PORT=8090`)
+- Corrupt local browser state: open with reset query if supported or clear site storage
+- Server state issues: inspect `user_data/server_state.json` and backup directories
+- Ollama unavailable: disable agent usage or ensure Ollama is reachable
+
+## Contributing
+
+See [Contributing Guide](docs/CONTRIBUTING.md) and PR/issue templates in `.github/`.
+
+## Architecture docs
+
+- [Overview](docs/architecture/OVERVIEW.md)
+- [Current Architecture and Model](docs/architecture/CURRENT_MODEL.md)
+- [Storage provider contract](docs/architecture/STORAGE_PROVIDER_CONTRACT.md)
+- [API reference](docs/API.md)
+- [Changelog](docs/changelog.md)
+- [Agent Architecture File](docs/agent.md)

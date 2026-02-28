@@ -3,17 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
-    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Local Pomodoro</title>
     <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
         <div class="dot"></div>
         <div>
-          <div class="title">Local Pomodoro</div>
+          <div class="title">
+            <a class="dashboard-home" href="index.html">Dashboard</a>
+            <span id="headerVersion" class="header-version">v0.0.0</span>
+          </div>
           <div class="subtitle">Focused sessions with a simple log</div>
         </div>
       </div>
@@ -21,6 +24,19 @@
         Toggle theme
       </button>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn" href="links.html">Links</a>
+      <a class="module-btn is-active" href="pomodoro.html" aria-current="page">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="grid">
       <section class="card timer-card">
@@ -40,9 +56,7 @@
           <canvas id="hourglass" width="220" height="280" aria-label="Sand clock"></canvas>
           <div class="time-display">
             <div id="timeLeft" class="time">25:00</div>
-            <div class="pill">
-              <span id="progressText">0%</span> complete
-            </div>
+            <div class="pill"><span id="progressText">0%</span> complete</div>
           </div>
         </div>
 
@@ -60,7 +74,9 @@
             <select id="projectSelect"></select>
           </label>
           <button id="refreshProjects" class="btn" type="button">Refresh projects</button>
-          <div class="help">If the list is empty, open via a local server so storage is shared.</div>
+          <div class="help">
+            If the list is empty, open via a local server so storage is shared.
+          </div>
         </div>
 
         <div class="note-area">
@@ -109,13 +125,11 @@
     <footer class="footer">
       Tip: host on your LAN with any static server (ex: `python -m http.server`).
     </footer>
+    <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
 
     <script src="js/storage.js"></script>
     <script src="js/app.js"></script>
-      <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-

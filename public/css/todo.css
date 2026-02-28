@@ -92,7 +92,9 @@ select {
   overflow: hidden;
   max-height: 1200px;
   opacity: 1;
-  transition: max-height 0.3s ease, opacity 0.2s ease;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.2s ease;
 }
 
 .collapsible.collapsed {

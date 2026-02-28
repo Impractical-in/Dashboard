@@ -1,0 +1,124 @@
+:root {
+  --ui-radius-card: 18px;
+  --ui-radius-control: 10px;
+  --ui-radius-pill: 999px;
+  --ui-space-xs: 6px;
+  --ui-space-sm: 10px;
+  --ui-space-md: 16px;
+  --ui-space-lg: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.subtitle {
+  font-size: 13px;
+}
+
+.stack,
+.grid {
+  display: grid;
+  gap: 24px;
+}
+
+.card,
+.tile {
+  border-radius: var(--ui-radius-card);
+  padding: var(--ui-space-lg);
+  display: grid;
+  gap: var(--ui-space-md);
+  align-content: start;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.form,
+.field {
+  display: grid;
+  gap: var(--ui-space-xs);
+}
+
+input,
+textarea,
+select {
+  border-radius: var(--ui-radius-control);
+  padding: 10px 12px;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.btn {
+  border-radius: var(--ui-radius-pill);
+  padding: 8px 16px;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+}
+
+.btn.icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.quick-row,
+.entry-actions,
+.task-actions,
+.week-row,
+.timer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.linked-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.link-pill,
+.tag,
+.tag-pill,
+.badge,
+.day-btn,
+.pill {
+  border-radius: var(--ui-radius-pill);
+}
+
+.hidden {
+  display: none;
+}

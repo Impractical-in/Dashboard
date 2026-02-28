@@ -90,7 +90,9 @@ select {
   overflow: hidden;
   max-height: 1200px;
   opacity: 1;
-  transition: max-height 0.3s ease, opacity 0.2s ease;
+  transition:
+    max-height 0.3s ease,
+    opacity 0.2s ease;
 }
 
 .collapsible.collapsed {
@@ -170,7 +172,9 @@ option {
   background: rgba(0, 0, 0, 0.02);
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .hobby-card.active::after {

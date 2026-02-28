@@ -68,7 +68,7 @@ function refreshProjectsList() {
 function populateProjects() {
   if (!projectSelect) return;
   const current = projectSelect.value;
-  projectSelect.innerHTML = "<option value=\"\">No project selected</option>";
+  projectSelect.innerHTML = '<option value="">No project selected</option>';
   projects.forEach((entry) => {
     if (!entry || !entry.id || !entry.title) return;
     const option = document.createElement("option");
@@ -106,6 +106,7 @@ function finalizePendingSegment(endTime) {
 }
 
 function setTheme(theme) {
+  if (themeToggle && themeToggle.dataset.sharedTheme === "1") return;
   document.body.classList.toggle("dark", theme === "dark");
   themeToggle.setAttribute("aria-pressed", theme === "dark");
   localStorage.setItem(THEME_KEY, theme);
@@ -127,9 +128,7 @@ function formatTime(totalSeconds) {
 
 function updateDisplay() {
   timeLeftEl.textContent = formatTime(state.remainingSeconds);
-  const progress = state.totalSeconds
-    ? 1 - state.remainingSeconds / state.totalSeconds
-    : 0;
+  const progress = state.totalSeconds ? 1 - state.remainingSeconds / state.totalSeconds : 0;
   progressText.textContent = `${Math.round(progress * 100)}%`;
   sessionTypeEl.textContent = state.mode;
   drawHourglass(progress);
@@ -401,15 +400,19 @@ function attachEvents() {
   typeFilter.addEventListener("change", renderLogs);
   exportBtn.addEventListener("click", exportLogs);
   clearBtn.addEventListener("click", clearLogs);
-  themeToggle.addEventListener("click", () => {
-    const nextTheme = document.body.classList.contains("dark") ? "light" : "dark";
-    setTheme(nextTheme);
-    updateDisplay();
-  });
+  if (!(themeToggle && themeToggle.dataset.sharedTheme === "1")) {
+    themeToggle.addEventListener("click", () => {
+      const nextTheme = document.body.classList.contains("dark") ? "light" : "dark";
+      setTheme(nextTheme);
+      updateDisplay();
+    });
+  }
 }
 
 function init() {
-  setTheme(getTheme());
+  if (!(themeToggle && themeToggle.dataset.sharedTheme === "1")) {
+    setTheme(getTheme());
+  }
   updateAudioSource();
   refreshProjectsList();
   const settings = getSettings();

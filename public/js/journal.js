@@ -152,8 +152,7 @@ function renderEntries() {
   const entries = Object.values(entriesByDate);
   const filtered = entries.filter((entry) => {
     const matchesText =
-      entry.title.toLowerCase().includes(search) ||
-      entry.body.toLowerCase().includes(search);
+      entry.title.toLowerCase().includes(search) || entry.body.toLowerCase().includes(search);
     const matchesTags = entry.tags.join(" ").toLowerCase().includes(search);
     return matchesText || matchesTags;
   });
@@ -169,7 +168,7 @@ function renderEntries() {
     item.className = "entry";
     const tagHtml = entry.tags.length
       ? entry.tags.map((tag) => `<span class="tag" data-tag="${tag}">${tag}</span>`).join("")
-      : "<span class=\"entry-meta\">No tags</span>";
+      : '<span class="entry-meta">No tags</span>';
     const linkHtml = entry.links.length
       ? entry.links
           .map((link) => {
@@ -179,7 +178,7 @@ function renderEntries() {
             return `<a class="link-pill" href="${href}">${found.label}</a>`;
           })
           .join("")
-      : "<span class=\"entry-meta\">No linked items</span>";
+      : '<span class="entry-meta">No linked items</span>';
     const bodyHtml = renderBodyWithLinks(entry.body);
     item.innerHTML = `
       <div class="entry-title">
@@ -258,15 +257,13 @@ function handleSlashCommands() {
           (item) => item.source === "project" && String(item.type).toLowerCase() !== "learning"
         )
       : normalizedType === "learning"
-      ? linkItems.filter(
-          (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
-        )
-      : normalizedType === "task"
-      ? linkItems.filter((item) => item.source === "task")
-      : linkItems.filter((item) => item.source === "hobby");
-  const filtered = query
-    ? list.filter((item) => item.label.toLowerCase().includes(query))
-    : list;
+        ? linkItems.filter(
+            (item) => item.source === "project" && String(item.type).toLowerCase() === "learning"
+          )
+        : normalizedType === "task"
+          ? linkItems.filter((item) => item.source === "task")
+          : linkItems.filter((item) => item.source === "hobby");
+  const filtered = query ? list.filter((item) => item.label.toLowerCase().includes(query)) : list;
   setSuggestions(filtered, normalizedType, (item, mode) => {
     const current = bodyInput.value;
     const replaced = current.replace(
@@ -319,7 +316,8 @@ function renderBodyWithLinks(body) {
           item.label.toLowerCase() === label.toLowerCase()
         );
       }
-      if (type === "task") return item.source === "task" && item.label.toLowerCase() === label.toLowerCase();
+      if (type === "task")
+        return item.source === "task" && item.label.toLowerCase() === label.toLowerCase();
       return item.source === "hobby" && item.label.toLowerCase() === label.toLowerCase();
     });
     if (!found) return match;

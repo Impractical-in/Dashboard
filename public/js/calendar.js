@@ -1,4 +1,4 @@
-const monthLabel = document.getElementById("monthLabel");
+ï»¿const monthLabel = document.getElementById("monthLabel");
 const calendarGrid = document.getElementById("calendarGrid");
 const weekView = document.getElementById("weekView");
 const prevPeriod = document.getElementById("prevPeriod");
@@ -88,7 +88,15 @@ function generateSeriesId() {
   return `series_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
 }
 
-function createQuickTask({ title, due, priority, durationMinutes, customColor = "", seriesId = "", seriesOriginId = "" }) {
+function createQuickTask({
+  title,
+  due,
+  priority,
+  durationMinutes,
+  customColor = "",
+  seriesId = "",
+  seriesOriginId = "",
+}) {
   const now = new Date().toISOString();
   const task = {
     id: generateTaskIdLocal(),
@@ -113,7 +121,9 @@ function createQuickTask({ title, due, priority, durationMinutes, customColor = 
 
 function selectedSeriesDays() {
   if (!quickSeriesDays) return [];
-  return Array.from(quickSeriesDays.querySelectorAll('input[type="checkbox"]:checked')).map((box) => Number(box.value));
+  return Array.from(quickSeriesDays.querySelectorAll('input[type="checkbox"]:checked')).map((box) =>
+    Number(box.value)
+  );
 }
 
 function syncQuickSeriesVisibility() {
@@ -123,7 +133,8 @@ function syncQuickSeriesVisibility() {
 
 function setQuickAddDefaults() {
   if (quickTaskDate && !quickTaskDate.value) quickTaskDate.value = formatDayKey(new Date());
-  if (quickSeriesEndDate && quickTaskDate && !quickSeriesEndDate.value) quickSeriesEndDate.value = quickTaskDate.value;
+  if (quickSeriesEndDate && quickTaskDate && !quickSeriesEndDate.value)
+    quickSeriesEndDate.value = quickTaskDate.value;
   if (quickSeriesDays && quickTaskDate) {
     const start = parseDateOnly(quickTaskDate.value);
     if (start) {
@@ -255,7 +266,8 @@ function initQuickAdd() {
 
   if (quickTaskSeriesToggle) {
     quickTaskSeriesToggle.addEventListener("change", () => {
-      if (quickTaskSeriesToggle.checked && quickSeriesEndDate && quickTaskDate) quickSeriesEndDate.value = quickTaskDate.value;
+      if (quickTaskSeriesToggle.checked && quickSeriesEndDate && quickTaskDate)
+        quickSeriesEndDate.value = quickTaskDate.value;
       syncQuickSeriesVisibility();
     });
   }
@@ -275,7 +287,8 @@ function initQuickAdd() {
   }
 
   quickAddForm.addEventListener("submit", handleQuickAddSubmit);
-}function startOfWeek(date) {
+}
+function startOfWeek(date) {
   const copy = new Date(date);
   const day = (copy.getDay() + 6) % 7;
   copy.setDate(copy.getDate() - day);
@@ -324,8 +337,18 @@ function formatClock(hour, minute) {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+function parseClockValue(value) {
+  const match = String(value || "")
+    .trim()
+    .match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  return { hour: Number(match[1]), minute: Number(match[2]) };
+}
+
 function endClock(hour, minute, durationMinutes) {
-  const start = (Math.max(0, Math.min(23, Number(hour) || 0)) * 60) + Math.max(0, Math.min(59, Number(minute) || 0));
+  const start =
+    Math.max(0, Math.min(23, Number(hour) || 0)) * 60 +
+    Math.max(0, Math.min(59, Number(minute) || 0));
   const end = start + clampDuration(durationMinutes || 60);
   return formatClock(Math.floor(end / 60) % 24, end % 60);
 }
@@ -397,10 +420,34 @@ function seedCalendarDemoDataIfNeeded() {
   };
 
   const demoTasks = [
-    { id: "cal-demo-1", title: "Wifi - DCM, OMI in detail with 4x4 FR", priority: "P1", due: `${isoDate(0)}T10:30`, durationMinutes: 90 },
-    { id: "cal-demo-2", title: "Read 11ax notes", priority: "P2", due: isoDate(1), durationMinutes: 60 },
-    { id: "cal-demo-3", title: "PHY lab run", priority: "P2", due: `${isoDate(2)}T15:00`, durationMinutes: 120 },
-    { id: "cal-demo-4", title: "Team sync", priority: "P3", due: `${isoDate(3)}T11:00`, durationMinutes: 45 },
+    {
+      id: "cal-demo-1",
+      title: "Wifi - DCM, OMI in detail with 4x4 FR",
+      priority: "P1",
+      due: `${isoDate(0)}T10:30`,
+      durationMinutes: 90,
+    },
+    {
+      id: "cal-demo-2",
+      title: "Read 11ax notes",
+      priority: "P2",
+      due: isoDate(1),
+      durationMinutes: 60,
+    },
+    {
+      id: "cal-demo-3",
+      title: "PHY lab run",
+      priority: "P2",
+      due: `${isoDate(2)}T15:00`,
+      durationMinutes: 120,
+    },
+    {
+      id: "cal-demo-4",
+      title: "Team sync",
+      priority: "P3",
+      due: `${isoDate(3)}T11:00`,
+      durationMinutes: 45,
+    },
     { id: "cal-demo-5", title: "Backlog grooming", priority: "P4", durationMinutes: 30 },
   ].map((task, i) => ({
     notes: "",
@@ -432,8 +479,14 @@ function saveTaskDueAtSlot(taskId, dayKey, hour, copyMode = false) {
     const sourceDate = parseDate(task.due);
     const targetDate = parseDateOnly(dayKey);
     if (sourceDate && targetDate) {
-      const sourceDay = new Date(sourceDate.getFullYear(), sourceDate.getMonth(), sourceDate.getDate());
-      const dayDelta = Math.round((targetDate.getTime() - sourceDay.getTime()) / (24 * 60 * 60 * 1000));
+      const sourceDay = new Date(
+        sourceDate.getFullYear(),
+        sourceDate.getMonth(),
+        sourceDate.getDate()
+      );
+      const dayDelta = Math.round(
+        (targetDate.getTime() - sourceDay.getTime()) / (24 * 60 * 60 * 1000)
+      );
       tasks.forEach((item) => {
         if (item.seriesId !== task.seriesId || !item.due) return;
         const current = parseDate(item.due);
@@ -509,6 +562,69 @@ function saveTaskTiming(taskId, dayKey, startMinuteOfDay, durationMinutes) {
   safeSave(TASKS_KEY, tasks);
 }
 
+function moveProjectRangeToDay(entry, dayKey) {
+  const target = parseDateOnly(dayKey);
+  if (!entry || !target) return;
+
+  const prevStart = parseDateOnly(entry.startDate);
+  const prevEnd = parseDateOnly(entry.endDate);
+  entry.startDate = dayKey;
+
+  if (prevStart && prevEnd && prevEnd >= prevStart) {
+    const spanDays = Math.round((prevEnd.getTime() - prevStart.getTime()) / (24 * 60 * 60 * 1000));
+    const nextEnd = new Date(target);
+    nextEnd.setDate(nextEnd.getDate() + spanDays);
+    entry.endDate = formatDayKey(nextEnd);
+  }
+}
+
+function saveProjectDueAtSlot(entryId, dayKey, hour) {
+  if (!entryId || !dayKey) return;
+  const entries = safeLoad(PROJECTS_KEY, []);
+  if (!Array.isArray(entries)) return;
+  const entry = entries.find((item) => String(item && item.id) === String(entryId));
+  if (!entry) return;
+
+  moveProjectRangeToDay(entry, dayKey);
+  entry.scheduleDays = [dayIndex(parseDateOnly(dayKey) || new Date())];
+  entry.calendarTime = formatClock(hour, 0);
+  entry.calendarDurationMinutes = clampDuration(entry.calendarDurationMinutes || 60);
+  entry.updatedAt = new Date().toISOString();
+  safeSave(PROJECTS_KEY, entries);
+}
+
+function saveProjectDuration(entryId, durationMinutes) {
+  if (!entryId) return;
+  const entries = safeLoad(PROJECTS_KEY, []);
+  if (!Array.isArray(entries)) return;
+  const entry = entries.find((item) => String(item && item.id) === String(entryId));
+  if (!entry) return;
+
+  entry.calendarDurationMinutes = clampDuration(durationMinutes);
+  if (!parseClockValue(entry.calendarTime)) entry.calendarTime = "09:00";
+  entry.updatedAt = new Date().toISOString();
+  safeSave(PROJECTS_KEY, entries);
+}
+
+function saveProjectTiming(entryId, dayKey, startMinuteOfDay, durationMinutes) {
+  if (!entryId || !dayKey) return;
+  const entries = safeLoad(PROJECTS_KEY, []);
+  if (!Array.isArray(entries)) return;
+  const entry = entries.find((item) => String(item && item.id) === String(entryId));
+  if (!entry) return;
+
+  const minuteOfDay = Math.max(0, Math.min(23 * 60 + 59, Number(startMinuteOfDay) || 0));
+  const hh = Math.floor(minuteOfDay / 60);
+  const mm = minuteOfDay % 60;
+
+  moveProjectRangeToDay(entry, dayKey);
+  entry.scheduleDays = [dayIndex(parseDateOnly(dayKey) || new Date())];
+  entry.calendarTime = formatClock(hh, mm);
+  entry.calendarDurationMinutes = clampDuration(durationMinutes);
+  entry.updatedAt = new Date().toISOString();
+  safeSave(PROJECTS_KEY, entries);
+}
+
 function spanTaskAcrossDays(taskId, startDayKey, hour, days) {
   const count = Math.max(2, Math.min(30, Number(days) || 0));
   const tasks = safeLoad(TASKS_KEY, []);
@@ -553,7 +669,12 @@ function deleteTaskWithOptions(taskId) {
     return;
   }
 
-  const choice = (window.prompt("Delete linked series: type 'one' for this occurrence, 'series' for entire series", "one") || "")
+  const choice = (
+    window.prompt(
+      "Delete linked series: type 'one' for this occurrence, 'series' for entire series",
+      "one"
+    ) || ""
+  )
     .trim()
     .toLowerCase();
   if (!choice) return;
@@ -579,6 +700,11 @@ function openTaskOrigin(taskId) {
   if (!task) return;
   const originId = task.seriesOriginId || task.id;
   window.location.href = `todo.html?focus=${encodeURIComponent(originId)}`;
+}
+
+function openProjectOrigin(entryId) {
+  if (!entryId) return;
+  window.location.href = `projects.html?focus=${encodeURIComponent(entryId)}`;
 }
 
 function buildScheduleMap() {
@@ -616,8 +742,10 @@ function buildScheduleMap() {
 
   const addWeekly = (item, label, scheduleDays, startDate, endDate) => {
     if (!Array.isArray(scheduleDays)) return;
-    const start = parseDateOnly(startDate) || new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const end = parseDateOnly(endDate) || new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+    const start =
+      parseDateOnly(startDate) || new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const end =
+      parseDateOnly(endDate) || new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
     for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
       if (!isWithinDateRange(day, startDate, endDate)) continue;
       if (!scheduleDays.includes(dayIndex(day))) continue;
@@ -630,7 +758,36 @@ function buildScheduleMap() {
 
   if (Array.isArray(projects)) {
     projects.forEach((entry) => {
-      addWeekly(entry.title, entry.type || "Project", entry.scheduleDays, entry.startDate, entry.endDate);
+      const scheduleDays = Array.isArray(entry.scheduleDays) ? entry.scheduleDays : [];
+      if (scheduleDays.length === 0) return;
+
+      const start =
+        parseDateOnly(entry.startDate) || new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+      const end =
+        parseDateOnly(entry.endDate) ||
+        new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0);
+      const slot = parseClockValue(entry.calendarTime) || { hour: 9, minute: 0 };
+      const durationMinutes = clampDuration(entry.calendarDurationMinutes || 60);
+
+      for (let day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+        if (!isWithinDateRange(day, entry.startDate, entry.endDate)) continue;
+        if (!scheduleDays.includes(dayIndex(day))) continue;
+
+        const key = formatDayKey(day);
+        const list = map.get(key) || [];
+        list.push({
+          id: entry.id,
+          title: entry.title || "Untitled entry",
+          type: entry.type || "Project",
+          source: "project",
+          time: formatClock(slot.hour, slot.minute),
+          hour: slot.hour,
+          minute: slot.minute,
+          timed: true,
+          durationMinutes,
+        });
+        map.set(key, list);
+      }
     });
   }
 
@@ -652,7 +809,7 @@ function renderDayDetails(items) {
     row.className = "detail-item";
     row.innerHTML = `
       <div class="detail-title">${item.customColor ? `<span class="color-dot" style="background:${item.customColor}"></span>` : ""}${item.title}</div>
-      <div class="detail-meta">${item.type}${item.timed ? ` • ${formatClock(item.hour, item.minute)}-${endClock(item.hour, item.minute, item.durationMinutes || 60)}` : (item.time ? ` • ${item.time}` : "")}${item.durationMinutes ? ` • ${item.durationMinutes}m` : ""}${item.seriesId ? " • linked series" : ""}</div>
+      <div class="detail-meta">${item.type}${item.timed ? ` â€¢ ${formatClock(item.hour, item.minute)}-${endClock(item.hour, item.minute, item.durationMinutes || 60)}` : item.time ? ` â€¢ ${item.time}` : ""}${item.durationMinutes ? ` â€¢ ${item.durationMinutes}m` : ""}${item.seriesId ? " â€¢ linked series" : ""}</div>
     `;
     dayDetails.appendChild(row);
   });
@@ -677,15 +834,28 @@ function renderCalendar() {
     const timedItems = list.filter((item) => item.timed);
     cell.innerHTML = `
       <div class="day-number">${day.getDate()}</div>
-      ${bannerItems.slice(0, 2).map((item) => `<div class="banner ${String(item.type).toLowerCase()}">${item.title}</div>`).join("")}
-      ${timedItems.slice(0, 2).map((item) => `<div class="timed ${String(item.type).toLowerCase()}" style="${item.customColor ? `background:${item.customColor};border-color:${item.customColor};color:#fff;` : ""}">${item.time ? `${item.time} ` : ""}${item.title}</div>`).join("")}
+      ${bannerItems
+        .slice(0, 2)
+        .map((item) => `<div class="banner ${String(item.type).toLowerCase()}">${item.title}</div>`)
+        .join("")}
+      ${timedItems
+        .slice(0, 2)
+        .map(
+          (item) =>
+            `<div class="timed ${String(item.type).toLowerCase()}" style="${item.customColor ? `background:${item.customColor};border-color:${item.customColor};color:#fff;` : ""}">${item.time ? `${item.time} ` : ""}${item.title}</div>`
+        )
+        .join("")}
     `;
     cell.addEventListener("click", () => renderDayDetails(list));
     calendarGrid.appendChild(cell);
   }
 }
 
-function attachResizeHandle(block, item, dayKey) {
+function attachResizeHandle(block, item, dayKey, handlers = {}) {
+  const saveDuration =
+    typeof handlers.saveDuration === "function" ? handlers.saveDuration : saveTaskDuration;
+  const saveTiming =
+    typeof handlers.saveTiming === "function" ? handlers.saveTiming : saveTaskTiming;
   const bottomHandle = document.createElement("div");
   bottomHandle.className = "resize-handle";
 
@@ -706,7 +876,7 @@ function attachResizeHandle(block, item, dayKey) {
     block.appendChild(bottomHandle);
   };
 
-  redraw((Number(item.hour || 0) * 60) + Number(item.minute || 0), item.durationMinutes || 60);
+  redraw(Number(item.hour || 0) * 60 + Number(item.minute || 0), item.durationMinutes || 60);
 
   bottomHandle.addEventListener("pointerdown", (event) => {
     event.preventDefault();
@@ -716,15 +886,15 @@ function attachResizeHandle(block, item, dayKey) {
 
     const onMove = (moveEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      const minutesDelta = Math.round((deltaY / SLOT_HEIGHT) * 60 / 15) * 15;
+      const minutesDelta = Math.round(((deltaY / SLOT_HEIGHT) * 60) / 15) * 15;
       const nextDuration = clampDuration(startDuration + minutesDelta);
-      redraw((Number(item.hour || 0) * 60) + Number(item.minute || 0), nextDuration);
+      redraw(Number(item.hour || 0) * 60 + Number(item.minute || 0), nextDuration);
     };
 
     const onEnd = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onEnd);
-      saveTaskDuration(item.id, Number(block.dataset.duration || item.durationMinutes || 60));
+      saveDuration(item.id, Number(block.dataset.duration || item.durationMinutes || 60));
       updateView();
     };
 
@@ -736,13 +906,13 @@ function attachResizeHandle(block, item, dayKey) {
     event.preventDefault();
     event.stopPropagation();
     const startY = event.clientY;
-    const startMinute = (Number(item.hour || 0) * 60) + Number(item.minute || 0);
+    const startMinute = Number(item.hour || 0) * 60 + Number(item.minute || 0);
     const startDuration = clampDuration(item.durationMinutes || 60);
     const endMinute = startMinute + startDuration;
 
     const onMove = (moveEvent) => {
       const deltaY = moveEvent.clientY - startY;
-      const deltaMinutes = Math.round((deltaY / SLOT_HEIGHT) * 60 / 15) * 15;
+      const deltaMinutes = Math.round(((deltaY / SLOT_HEIGHT) * 60) / 15) * 15;
       let nextStart = startMinute + deltaMinutes;
       nextStart = Math.max(0, Math.min(endMinute - MIN_DURATION, nextStart));
       let nextDuration = endMinute - nextStart;
@@ -758,7 +928,7 @@ function attachResizeHandle(block, item, dayKey) {
       window.removeEventListener("pointerup", onEnd);
       const sm = Number(block.dataset.startMinute || startMinute);
       const dur = Number(block.dataset.duration || startDuration);
-      saveTaskTiming(item.id, dayKey, sm, dur);
+      saveTiming(item.id, dayKey, sm, dur);
       updateView();
     };
 
@@ -802,8 +972,8 @@ function renderWeekView() {
     day.setDate(weekStart.getDate() + i);
     const key = formatDayKey(day);
     const list = (scheduleMap.get(key) || []).sort((a, b) => {
-      const aMin = (Number(a.hour || 0) * 60) + Number(a.minute || 0);
-      const bMin = (Number(b.hour || 0) * 60) + Number(b.minute || 0);
+      const aMin = Number(a.hour || 0) * 60 + Number(a.minute || 0);
+      const bMin = Number(b.hour || 0) * 60 + Number(b.minute || 0);
       return aMin - bMin;
     });
     const dayCol = document.createElement("div");
@@ -823,9 +993,11 @@ function renderWeekView() {
         event.preventDefault();
         cell.classList.remove("drag-over");
         const taskId = event.dataTransfer?.getData("text/task-id") || activeDragTaskId;
-        if (!taskId) return;
+        const projectId = event.dataTransfer?.getData("text/project-id");
         const copyMode = Boolean(event.altKey || event.ctrlKey);
-        saveTaskDueAtSlot(taskId, key, hour, copyMode);
+        if (taskId) saveTaskDueAtSlot(taskId, key, hour, copyMode);
+        else if (projectId) saveProjectDueAtSlot(projectId, key, hour);
+        else return;
         activeDragTaskId = null;
         updateView();
       });
@@ -844,7 +1016,10 @@ function renderWeekView() {
           if (item.seriesId) block.classList.add("series-item");
           if (item.timed) {
             const offsetPx = Math.round((Number(item.minute || 0) / 60) * SLOT_HEIGHT);
-            const heightPx = Math.max(24, Math.round((clampDuration(item.durationMinutes || 60) / 60) * SLOT_HEIGHT));
+            const heightPx = Math.max(
+              24,
+              Math.round((clampDuration(item.durationMinutes || 60) / 60) * SLOT_HEIGHT)
+            );
             block.style.marginTop = `${offsetPx}px`;
             block.style.height = `${heightPx}px`;
             block.dataset.duration = String(clampDuration(item.durationMinutes || 60));
@@ -853,7 +1028,8 @@ function renderWeekView() {
           if (item.source === "task" && item.id) {
             block.classList.add("draggable");
             block.draggable = true;
-            block.title = "Double-click: open origin task. Shift + double-click: span days. Right-click: delete one or series. Alt/Ctrl + drop: copy.";
+            block.title =
+              "Double-click: open origin task. Shift + double-click: span days. Right-click: delete one or series. Alt/Ctrl + drop: copy.";
             block.addEventListener("dragstart", (event) => {
               activeDragTaskId = item.id;
               event.dataTransfer?.setData("text/task-id", String(item.id));
@@ -861,7 +1037,9 @@ function renderWeekView() {
             });
             block.addEventListener("dragend", () => {
               activeDragTaskId = null;
-              weekView.querySelectorAll(".drag-over").forEach((el) => el.classList.remove("drag-over"));
+              weekView
+                .querySelectorAll(".drag-over")
+                .forEach((el) => el.classList.remove("drag-over"));
             });
             block.addEventListener("dblclick", (event) => {
               event.preventDefault();
@@ -884,6 +1062,26 @@ function renderWeekView() {
               updateView();
             });
             if (item.timed) attachResizeHandle(block, item, key);
+          } else if (item.source === "project" && item.id) {
+            block.classList.add("draggable");
+            block.draggable = true;
+            block.title =
+              "Drag to move date/time. Resize to adjust start and duration. Double-click to open project.";
+            block.addEventListener("dragstart", (event) => {
+              event.dataTransfer?.setData("text/project-id", String(item.id));
+              if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+            });
+            block.addEventListener("dblclick", (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              openProjectOrigin(item.id);
+            });
+            if (item.timed) {
+              attachResizeHandle(block, item, key, {
+                saveDuration: saveProjectDuration,
+                saveTiming: saveProjectTiming,
+              });
+            }
           }
 
           cell.appendChild(block);
@@ -974,12 +1172,3 @@ function initCalendar() {
 }
 
 initCalendar();
-
-
-
-
-
-
-
-
-

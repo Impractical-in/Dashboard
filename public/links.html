@@ -3,41 +3,64 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/oatcss/dist/oat.min.css" />
-    <link rel="stylesheet" href="css/oat-bridge.css" />
     <title>Quick Links</title>
     <link rel="stylesheet" href="css/links.css" />
+    <link rel="stylesheet" href="css/ui-system.css" />
+    <link rel="stylesheet" href="css/terminal-overrides.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <div class="title">Quick Links</div>
+        <div class="title">
+          <a class="dashboard-home" href="index.html">Dashboard</a>
+          <span id="headerVersion" class="header-version">v0.0.0</span>
+        </div>
         <div class="subtitle">Editable shortcuts with custom labels</div>
       </div>
-      <a class="btn ghost" href="index.html">Back to Home</a>
+      <div class="topbar-actions">
+        <button id="themeToggle" class="btn ghost" type="button" aria-pressed="false">
+          Theme: Dark
+        </button>
+        <a class="btn ghost" href="index.html">Back to Home</a>
+      </div>
     </header>
+
+    <nav class="module-menu" aria-label="Modules">
+      <a class="module-btn" href="index.html">Overview</a>
+      <a class="module-btn" href="todo.html">To-Do</a>
+      <a class="module-btn" href="projects.html">Projects</a>
+      <a class="module-btn" href="calendar.html">Calendar</a>
+      <a class="module-btn" href="hobbies.html">Hobbies</a>
+      <a class="module-btn" href="journal.html">Journal</a>
+      <a class="module-btn is-active" href="links.html" aria-current="page">Links</a>
+      <a class="module-btn" href="pomodoro.html">Pomodoro</a>
+      <a class="module-btn" href="sync.html">Settings</a>
+      <a class="module-btn" href="resume.html">Resume</a>
+    </nav>
 
     <main class="stack">
       <section class="card collapsible-card">
         <div class="card-header">
           <div class="section-title">Add a link</div>
-          <button class="btn icon" id="linkFormToggle" type="button" aria-expanded="false">+</button>
+          <button class="btn icon" id="linkFormToggle" type="button" aria-expanded="false">
+            +
+          </button>
         </div>
         <div class="collapsible collapsed" id="linkFormWrap">
           <form id="linkForm" class="form">
-          <label class="field">
-            <span>Label</span>
-            <input id="linkLabel" type="text" placeholder="Link label" required />
-          </label>
-          <label class="field">
-            <span>URL</span>
-            <input id="linkUrl" type="text" placeholder="https://example.com" required />
-          </label>
-          <button class="btn primary" type="submit">Save link</button>
-          <div class="form-actions">
-            <button class="btn hidden" id="linkDelete" type="button">Delete link</button>
-            <button class="btn" id="linkCancel" type="button">Cancel edit</button>
-          </div>
+            <label class="field">
+              <span>Label</span>
+              <input id="linkLabel" type="text" placeholder="Link label" required />
+            </label>
+            <label class="field">
+              <span>URL</span>
+              <input id="linkUrl" type="text" placeholder="https://example.com" required />
+            </label>
+            <button class="btn primary" type="submit">Save link</button>
+            <div class="form-actions">
+              <button class="btn hidden" id="linkDelete" type="button">Delete link</button>
+              <button class="btn" id="linkCancel" type="button">Cancel edit</button>
+            </div>
           </form>
         </div>
       </section>
@@ -47,13 +70,11 @@
         <div id="linksList" class="links-list"></div>
       </section>
     </main>
+    <script src="js/version.js"></script>
+    <script src="js/header.js"></script>
+    <script src="js/theme-toggle.js"></script>
 
     <script src="js/storage.js"></script>
     <script src="js/links.js"></script>
-      <script src="js/agent-chat.js"></script>
   </body>
 </html>
-
-
-
-

@@ -1,17 +1,20 @@
 (function initSimpleBackupPage() {
   if (typeof window === "undefined" || typeof document === "undefined") return;
 
+  const BACKUP_HISTORY_KEY = "localBackupHistory";
+  const BACKUP_VAULT_KEY = "localBackupVault";
+  const LAST_BACKUP_KEY = "localLastSnapshot";
   const saveBtn = document.getElementById("saveSnapshotBtn");
   const uploadBtn = document.getElementById("uploadSnapshotBtn");
-  const targetSelect = document.getElementById("snapshotTarget");
   const uploadInput = document.getElementById("snapshotUploadInput");
   const statusEl = document.getElementById("backupStatus");
+  const historyEl = document.getElementById("backupHistory");
 
   function setStatus(text, isError) {
     if (!statusEl) return;
     statusEl.textContent = text;
-    statusEl.style.borderColor = isError ? "#b92c2c" : "";
-    statusEl.style.color = isError ? "#ffd7d7" : "";
+    statusEl.style.borderColor = isError ? "#8a2d2a" : "";
+    statusEl.style.color = isError ? "#ffb4af" : "";
   }
 
   function stampNow() {
@@ -26,7 +29,22 @@
   }
 
   function snapshotFileName() {
-    return `server_state_${stampNow()}.json`;
+    return `local_state_${stampNow()}.json`;
+  }
+
+  function readJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed ?? fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeJson(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
   }
 
   function buildLocalSnapshot() {
@@ -36,25 +54,15 @@
       .forEach((key) => {
         try {
           data[key] = JSON.parse(localStorage.getItem(key));
-        } catch (err) {
+        } catch (_) {
           data[key] = localStorage.getItem(key);
         }
       });
     return {
       version: 1,
+      source: "local",
       updatedAt: new Date().toISOString(),
       data,
-    };
-  }
-
-  async function fetchServerSnapshot() {
-    const response = await fetch("/api/state");
-    if (!response.ok) throw new Error("Failed to read server state");
-    const payload = await response.json();
-    return {
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      data: payload && payload.data && typeof payload.data === "object" ? payload.data : {},
     };
   }
 
@@ -70,42 +78,64 @@
     URL.revokeObjectURL(url);
   }
 
-  async function uploadToServer(name, backupPayload) {
-    const response = await fetch("/api/state/backups/upload", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        backup: backupPayload,
-      }),
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || "Upload failed");
+  function addBackupHistory(entry) {
+    const existing = readJson(BACKUP_HISTORY_KEY, []);
+    const next = Array.isArray(existing) ? existing : [];
+    next.unshift(entry);
+    writeJson(BACKUP_HISTORY_KEY, next.slice(0, 20));
+  }
+
+  function renderBackupHistory() {
+    if (!historyEl) return;
+    const history = readJson(BACKUP_HISTORY_KEY, []);
+    if (!Array.isArray(history) || !history.length) {
+      historyEl.textContent = "No local backup saved yet.";
+      return;
     }
-    return response.json();
+    const last = history[0];
+    const lastWhen = last && last.at ? new Date(last.at).toLocaleString() : "unknown";
+    const vault = readJson(BACKUP_VAULT_KEY, []);
+    const vaultCount = Array.isArray(vault) ? vault.length : 0;
+    historyEl.textContent = `Latest backup: ${last && last.name ? last.name : "unknown"} (${lastWhen}) | Local vault copies: ${vaultCount}`;
+  }
+
+  function persistVaultSnapshot(name, payload) {
+    const vault = readJson(BACKUP_VAULT_KEY, []);
+    const next = Array.isArray(vault) ? vault : [];
+    next.unshift({
+      name,
+      at: new Date().toISOString(),
+      snapshot: payload,
+    });
+    writeJson(BACKUP_VAULT_KEY, next.slice(0, 3));
+  }
+
+  function applySnapshotToLocalStorage(snapshot) {
+    const payload = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const data =
+      payload.data && typeof payload.data === "object"
+        ? payload.data
+        : payload && typeof payload === "object"
+          ? payload
+          : {};
+    Object.keys(localStorage)
+      .filter((key) => !key.startsWith("__"))
+      .forEach((key) => localStorage.removeItem(key));
+    Object.entries(data).forEach(([key, value]) => {
+      localStorage.setItem(key, JSON.stringify(value));
+    });
   }
 
   async function onSaveSnapshot() {
     try {
-      const target = targetSelect ? String(targetSelect.value || "server") : "server";
       const filename = snapshotFileName();
-      if (target === "device") {
-        const payload = location.protocol.startsWith("http")
-          ? await fetchServerSnapshot()
-          : buildLocalSnapshot();
-        downloadJson(filename, payload);
-        setStatus(`Saved to device: ${filename}`, false);
-        return;
-      }
-
-      if (!location.protocol.startsWith("http")) {
-        setStatus("Server save requires opening dashboard via http://<ip>:8080", true);
-        return;
-      }
-      const payload = await fetchServerSnapshot();
-      await uploadToServer(filename, payload);
-      setStatus(`Saved snapshot to server: ${filename}`, false);
+      const payload = buildLocalSnapshot();
+      downloadJson(filename, payload);
+      persistVaultSnapshot(filename, payload);
+      localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+      addBackupHistory({ name: filename, at: new Date().toISOString() });
+      renderBackupHistory();
+      setStatus(`Saved local snapshot: ${filename}`, false);
     } catch (err) {
       setStatus(`Save failed: ${err && err.message ? err.message : "unknown error"}`, true);
     }
@@ -113,30 +143,30 @@
 
   async function onUploadSnapshot() {
     try {
-      if (!location.protocol.startsWith("http")) {
-        setStatus("Upload requires opening dashboard via http://<ip>:8080", true);
-        return;
-      }
-      const file = uploadInput && uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
+      const file =
+        uploadInput && uploadInput.files && uploadInput.files[0] ? uploadInput.files[0] : null;
       if (!file) {
         setStatus("Select a snapshot JSON file first.", true);
         return;
       }
       const raw = await file.text();
       const parsed = JSON.parse(raw);
-      const envelope =
-        parsed && typeof parsed === "object" && parsed.data && typeof parsed.data === "object"
-          ? parsed
-          : { version: 1, updatedAt: new Date().toISOString(), data: parsed };
-      const filename = file.name && file.name.endsWith(".json") ? file.name : snapshotFileName();
-      await uploadToServer(filename, envelope);
+      applySnapshotToLocalStorage(parsed);
+      localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString());
+      addBackupHistory({
+        name: file.name || "uploaded_snapshot.json",
+        at: new Date().toISOString(),
+      });
       if (uploadInput) uploadInput.value = "";
-      setStatus(`Uploaded snapshot to server: ${filename}`, false);
+      renderBackupHistory();
+      setStatus(`Restored local snapshot: ${file.name || "snapshot"}. Reloading...`, false);
+      window.setTimeout(() => window.location.reload(), 300);
     } catch (err) {
-      setStatus(`Upload failed: ${err && err.message ? err.message : "invalid snapshot"}`, true);
+      setStatus(`Restore failed: ${err && err.message ? err.message : "invalid snapshot"}`, true);
     }
   }
 
   if (saveBtn) saveBtn.addEventListener("click", onSaveSnapshot);
   if (uploadBtn) uploadBtn.addEventListener("click", onUploadSnapshot);
+  renderBackupHistory();
 })();
