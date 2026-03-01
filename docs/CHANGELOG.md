@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.0.4 (2026-02-28)
+
+- Version bump and release scaffold.
+
 ## v1.0.3 (Current) (2026-02-28)
 
 - Rename top header brand from `Local Dashboard` to `Dashboard`.

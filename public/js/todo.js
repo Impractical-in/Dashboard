@@ -24,12 +24,26 @@ const quickButtons = document.querySelectorAll("[data-quick]");
 const formToggle = document.getElementById("taskFormToggle");
 const formWrap = document.getElementById("taskFormWrap");
 const formCard = document.getElementById("taskFormCard");
+const taskColorPalette = document.getElementById("taskColorPalette");
 const Core = window.DashboardCore;
 
 const STORAGE_KEY = "todoTasks";
 const ARCHIVE_KEY = "todoArchive";
 const PROJECTS_KEY = "dashboardEntries";
 const HOBBIES_KEY = "hobbyTracker";
+const DEFAULT_TASK_COLOR = "#3f88c5";
+const TASK_COLOR_PRESETS = [
+  { name: "Neon Coral", value: "#ff6b6b" },
+  { name: "Pastel Peach", value: "#ffd6a5" },
+  { name: "Neon Mint", value: "#06d6a0" },
+  { name: "Pastel Mint", value: "#b8f2e6" },
+  { name: "Neon Cyan", value: "#4cc9f0" },
+  { name: "Pastel Sky", value: "#a0c4ff" },
+  { name: "Neon Violet", value: "#9b5de5" },
+  { name: "Pastel Lavender", value: "#cdb4db" },
+  { name: "Neon Pink", value: "#ff4d9d" },
+  { name: "Pastel Pink", value: "#ffafcc" },
+];
 
 let tasks = [];
 let archive = [];
@@ -37,6 +51,46 @@ let editingId = null;
 let linkItems = [];
 let currentLinks = [];
 let formOpen = false;
+
+function normalizeHexColor(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function setTaskColorValue(value) {
+  if (!taskColorInput) return;
+  taskColorInput.value = value;
+  syncTaskColorPaletteState();
+}
+
+function syncTaskColorPaletteState() {
+  if (!taskColorPalette || !taskColorInput) return;
+  const current = normalizeHexColor(taskColorInput.value);
+  taskColorPalette.querySelectorAll(".color-swatch").forEach((button) => {
+    const match = normalizeHexColor(button.dataset.color) === current;
+    button.classList.toggle("is-active", match);
+    button.setAttribute("aria-pressed", String(match));
+  });
+}
+
+function renderTaskColorPalette() {
+  if (!taskColorPalette) return;
+  taskColorPalette.innerHTML = "";
+  TASK_COLOR_PRESETS.forEach((preset) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "color-swatch";
+    button.dataset.color = preset.value;
+    button.title = `${preset.name} (${preset.value})`;
+    button.setAttribute("aria-label", `${preset.name} ${preset.value}`);
+    button.style.background = preset.value;
+    button.addEventListener("click", () => {
+      setTaskColorValue(preset.value);
+      if (titleInput) titleInput.focus();
+    });
+    taskColorPalette.appendChild(button);
+  });
+  syncTaskColorPaletteState();
+}
 
 function loadTasks() {
   const data = loadData(STORAGE_KEY, []);
@@ -350,7 +404,7 @@ function addTask(event) {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
-  if (taskColorInput) taskColorInput.value = "#3f88c5";
+  setTaskColorValue(DEFAULT_TASK_COLOR);
   editingId = null;
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
@@ -446,7 +500,7 @@ taskList.addEventListener("click", (event) => {
       tagsInput.value = Array.isArray(task.tags) ? task.tags.join(", ") : "";
       if (checklistInput) checklistInput.value = checklistToText(task.checklist);
       currentLinks = Array.isArray(task.linkedItems) ? [...task.linkedItems] : [];
-      if (taskColorInput) taskColorInput.value = task.customColor || "#3f88c5";
+      setTaskColorValue(task.customColor || DEFAULT_TASK_COLOR);
       renderLinkedItems();
       editingId = task.id;
       taskDeleteBtn.classList.remove("hidden");
@@ -482,6 +536,8 @@ initStorage().then(() => {
   scheduleDateInput.value = today.toISOString().slice(0, 10);
   renderScheduleWeek(today);
   renderScheduledItems();
+  renderTaskColorPalette();
+  setTaskColorValue(DEFAULT_TASK_COLOR);
   renderTasks();
   renderArchive();
   taskDeleteBtn.classList.add("hidden");
@@ -506,7 +562,7 @@ taskDeleteBtn.addEventListener("click", () => {
   renderTasks();
   form.reset();
   priorityInput.value = "P2";
-  if (taskColorInput) taskColorInput.value = "#3f88c5";
+  setTaskColorValue(DEFAULT_TASK_COLOR);
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   if (checklistInput) checklistInput.value = "";
@@ -518,7 +574,7 @@ taskCancelBtn.addEventListener("click", () => {
   editingId = null;
   form.reset();
   priorityInput.value = "P2";
-  if (taskColorInput) taskColorInput.value = "#3f88c5";
+  setTaskColorValue(DEFAULT_TASK_COLOR);
   taskDeleteBtn.classList.add("hidden");
   currentLinks = [];
   if (checklistInput) checklistInput.value = "";
@@ -643,6 +699,11 @@ if (formToggle && formWrap) {
   setFormOpen(false);
   formToggle.addEventListener("click", () => setFormOpen(!formOpen));
   formWrap.addEventListener("focusin", () => setFormOpen(true));
+}
+
+if (taskColorInput) {
+  taskColorInput.addEventListener("input", syncTaskColorPaletteState);
+  taskColorInput.addEventListener("change", syncTaskColorPaletteState);
 }
 
 window.addEventListener("focus", () => {

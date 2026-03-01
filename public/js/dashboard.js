@@ -1101,196 +1101,96 @@ function seedDashboardCalendarDemoDataIfNeeded() {
 
 function renderCalendarPreview(target) {
   seedDashboardCalendarDemoDataIfNeeded();
-  blockCalendarTileNavigation(target);
   const tasks = loadFromStorage("todoTasks", []);
   const activeTasks = Array.isArray(tasks) ? tasks.filter((task) => task && !task.done) : [];
+  const sortedTasks = [...activeTasks].sort((a, b) => {
+    const priorityDelta = comparePriority(a && a.priority, b && b.priority);
+    if (priorityDelta !== 0) return priorityDelta;
+    const dueA = a && a.due ? String(a.due) : "";
+    const dueB = b && b.due ? String(b.due) : "";
+    if (!dueA && !dueB) return String(a && a.title ? a.title : "").localeCompare(String(b && b.title ? b.title : ""));
+    if (!dueA) return 1;
+    if (!dueB) return -1;
+    if (dueA !== dueB) return dueA.localeCompare(dueB);
+    return String(a && a.title ? a.title : "").localeCompare(String(b && b.title ? b.title : ""));
+  });
+  const topTasks = sortedTasks.slice(0, 8);
 
   target.innerHTML = "";
   const wrap = document.createElement("div");
   wrap.className = "calendar-dash";
   wrap.innerHTML = `
-    <div class="calendar-dash-meta">Drag tasks anywhere in this board, then set date/time inline.</div>
-    <div class="calendar-dash-board"></div>
+    <div class="calendar-dash-meta">Top 8 tasks sorted by priority and due date.</div>
+    <div class="calendar-dash-help">P1 is highest. Empty slots keep alignment stable.</div>
+    <div class="calendar-dash-actions">
+      <a class="calendar-dash-link" href="todo.html">Manage tasks</a>
+      <a class="calendar-dash-link" href="calendar.html">Open full calendar</a>
+    </div>
+    <div class="calendar-patch-grid" role="list" aria-label="Top 8 prioritized calendar tasks"></div>
   `;
   target.appendChild(wrap);
 
-  const board = wrap.querySelector(".calendar-dash-board");
-  if (!board || !activeTasks.length) {
+  const board = wrap.querySelector(".calendar-patch-grid");
+  if (!board) return;
+
+  if (!topTasks.length) {
     const empty = document.createElement("div");
-    empty.className = "preview-empty";
-    empty.textContent = "No active tasks. Add tasks in To-Do to schedule here.";
-    target.appendChild(empty);
-    return;
+    empty.className = "calendar-patch-note";
+    empty.textContent = "No active tasks. Add tasks in To-Do to fill these slots.";
+    board.appendChild(empty);
   }
 
-  const taskMap = new Map(activeTasks.map((task) => [String(task.id), task]));
-  const layout = loadCalendarLayout();
-  let currentZ = 1;
-
-  const persistTaskUpdates = () => {
-    const next = Array.isArray(tasks) ? tasks : [];
-    saveToStorage("todoTasks", next);
-    renderAllPreviews();
-  };
-
-  activeTasks.slice(0, 12).forEach((task, index) => {
-    const id = String(task.id || "");
-    if (!id) return;
-    const dueParts = readTaskDueParts(task.due);
-    const pos = clampCardPosition(layout[id] || makeDefaultCardPosition(index), board);
-    layout[id] = pos;
-
+  topTasks.forEach((task, index) => {
     const card = document.createElement("article");
-    card.className = "calendar-task-card";
-    card.dataset.taskId = id;
-    card.style.left = `${pos.x}px`;
-    card.style.top = `${pos.y}px`;
-    card.style.zIndex = String(currentZ++);
-    card.innerHTML = `
-      <div class="calendar-task-head">
-        <span class="calendar-task-title">${task.title || "Untitled task"}</span>
-      </div>
-      <div class="calendar-task-row">
-        <label>Date</label>
-        <input type="date" value="${dueParts.date}" />
-      </div>
-      <div class="calendar-task-row">
-        <label>Time</label>
-        <input type="time" value="${dueParts.time}" />
-        <button type="button" class="calendar-clear-time">Clear</button>
-      </div>
-    `;
-    board.appendChild(card);
+    card.className = "calendar-patch-card";
+    card.setAttribute("role", "listitem");
+    card.setAttribute("aria-label", `Calendar slot ${index + 1}`);
+    const due = readTaskDueParts(task.due);
 
-    const dateInput = card.querySelector("input[type='date']");
-    const timeInput = card.querySelector("input[type='time']");
-    const clearBtn = card.querySelector(".calendar-clear-time");
+    const head = document.createElement("div");
+    head.className = "calendar-patch-head";
 
-    const applyDueFromInputs = () => {
-      const liveTask = taskMap.get(id);
-      if (!liveTask || !dateInput || !timeInput) return;
-      updateTaskDueFromInputs(liveTask, dateInput.value, timeInput.value);
-      persistTaskUpdates();
-    };
+    const title = document.createElement("span");
+    title.className = "calendar-patch-title";
+    title.textContent = String(task && task.title ? task.title : "Untitled task");
 
-    if (dateInput) dateInput.addEventListener("change", applyDueFromInputs);
-    if (timeInput) timeInput.addEventListener("change", applyDueFromInputs);
-    if (clearBtn) {
-      clearBtn.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (timeInput) timeInput.value = "";
-        applyDueFromInputs();
-      });
+    const pill = document.createElement("span");
+    const priority = String(task && task.priority ? task.priority : "P4").toUpperCase();
+    pill.className = `preview-pill ${priority.toLowerCase()}`;
+    pill.textContent = priority;
+
+    head.appendChild(title);
+    head.appendChild(pill);
+
+    const dueRow = document.createElement("div");
+    dueRow.className = "calendar-patch-meta";
+    dueRow.dataset.role = "due-meta";
+    if (due.date && due.time) {
+      dueRow.textContent = `Due ${formatShortDate(`${due.date}T${due.time}`, true)}`;
+    } else if (due.date) {
+      dueRow.textContent = `Due ${formatShortDate(due.date, false)}`;
+    } else {
+      dueRow.textContent = "No due date";
     }
 
-    const startCardDrag = (startClientX, startClientY) => {
-      const startLeft = Number.parseFloat(card.style.left || "0");
-      const startTop = Number.parseFloat(card.style.top || "0");
-      card.style.zIndex = String(currentZ++);
+    const slotRow = document.createElement("div");
+    slotRow.className = "calendar-patch-rank";
+    slotRow.textContent = `Slot ${index + 1} of 8`;
 
-      const onMove = (clientX, clientY) => {
-        const nextPos = clampCardPosition(
-          {
-            x: startLeft + (clientX - startClientX),
-            y: startTop + (clientY - startClientY),
-          },
-          board
-        );
-        card.style.left = `${nextPos.x}px`;
-        card.style.top = `${nextPos.y}px`;
-      };
-
-      const onEnd = () => {
-        const endPos = clampCardPosition(
-          {
-            x: Number.parseFloat(card.style.left || "0"),
-            y: Number.parseFloat(card.style.top || "0"),
-          },
-          board
-        );
-        layout[id] = endPos;
-        saveCalendarLayout(layout);
-      };
-
-      return { onMove, onEnd };
-    };
-
-    card.addEventListener("pointerdown", (event) => {
-      const targetEl = event.target;
-      if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
-      event.preventDefault();
-      const drag = startCardDrag(event.clientX, event.clientY);
-      const pointerId = event.pointerId;
-      if (typeof card.setPointerCapture === "function") {
-        try {
-          card.setPointerCapture(pointerId);
-        } catch (_) {}
-      }
-
-      const onPointerMove = (moveEvent) => drag.onMove(moveEvent.clientX, moveEvent.clientY);
-      const onPointerEnd = () => {
-        card.removeEventListener("pointermove", onPointerMove);
-        card.removeEventListener("pointerup", onPointerEnd);
-        card.removeEventListener("pointercancel", onPointerEnd);
-        drag.onEnd();
-      };
-
-      card.addEventListener("pointermove", onPointerMove);
-      card.addEventListener("pointerup", onPointerEnd);
-      card.addEventListener("pointercancel", onPointerEnd);
-    });
-
-    card.addEventListener("mousedown", (event) => {
-      const targetEl = event.target;
-      if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
-      if (event.button !== 0) return;
-      event.preventDefault();
-      const drag = startCardDrag(event.clientX, event.clientY);
-
-      const onMouseMove = (moveEvent) => drag.onMove(moveEvent.clientX, moveEvent.clientY);
-      const onMouseUp = () => {
-        window.removeEventListener("mousemove", onMouseMove);
-        window.removeEventListener("mouseup", onMouseUp);
-        drag.onEnd();
-      };
-
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-    });
-
-    card.addEventListener(
-      "touchstart",
-      (event) => {
-        const targetEl = event.target;
-        if (targetEl instanceof HTMLElement && targetEl.closest("input,button,label")) return;
-        const touch = event.touches && event.touches[0];
-        if (!touch) return;
-        event.preventDefault();
-        const drag = startCardDrag(touch.clientX, touch.clientY);
-
-        const onTouchMove = (moveEvent) => {
-          const nextTouch = moveEvent.touches && moveEvent.touches[0];
-          if (!nextTouch) return;
-          drag.onMove(nextTouch.clientX, nextTouch.clientY);
-          moveEvent.preventDefault();
-        };
-        const onTouchEnd = () => {
-          window.removeEventListener("touchmove", onTouchMove);
-          window.removeEventListener("touchend", onTouchEnd);
-          window.removeEventListener("touchcancel", onTouchEnd);
-          drag.onEnd();
-        };
-
-        window.addEventListener("touchmove", onTouchMove, { passive: false });
-        window.addEventListener("touchend", onTouchEnd);
-        window.addEventListener("touchcancel", onTouchEnd);
-      },
-      { passive: false }
-    );
+    card.appendChild(head);
+    card.appendChild(dueRow);
+    card.appendChild(slotRow);
+    board.appendChild(card);
   });
 
-  saveCalendarLayout(layout);
+  for (let i = topTasks.length; i < 8; i += 1) {
+    const placeholder = document.createElement("article");
+    placeholder.className = "calendar-patch-card calendar-patch-empty";
+    placeholder.setAttribute("role", "listitem");
+    placeholder.setAttribute("aria-label", `Calendar empty slot ${i + 1}`);
+    placeholder.textContent = "Empty slot";
+    board.appendChild(placeholder);
+  }
 }
 
 function renderSyncPreview(target) {

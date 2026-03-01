@@ -471,6 +471,33 @@ textarea {
   background: transparent;
 }
 
+.color-palette {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.color-swatch {
+  width: 100%;
+  min-width: 20px;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-swatch.is-active {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.color-help {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .color-dot {
   width: 10px;
   height: 10px;

@@ -1022,3 +1022,9 @@ window.addEventListener("focus", () => {
   renderEntries();
   renderFormLinkedItems();
 });
+
+if (typeof window !== "undefined") {
+  window.addEventListener("dashboard-theme-change", () => {
+    renderGantt();
+  });
+}

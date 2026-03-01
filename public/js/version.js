@@ -8,7 +8,7 @@
   }
 })(function createVersions() {
   return {
-    dashboard: "1.0.3",
+    dashboard: "1.0.4",
     agent: "v0.2",
   };
 });

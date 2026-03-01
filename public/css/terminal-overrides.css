@@ -14,6 +14,12 @@
   --p3: #ffd166;
   --p4: #00d4aa;
   --shadow: none;
+  --tone-strong: #072212;
+  --tone-button: #03120a;
+  --tone-hover: #05170d;
+  --tone-danger: #1a0b0b;
+  --tone-overdue: #130707;
+  --overlay-bg: rgba(0, 0, 0, 0.72);
 }
 
 body.theme-light {
@@ -31,6 +37,12 @@ body.theme-light {
   --p2: #b8741f;
   --p3: #8b6c1b;
   --p4: #1f8670;
+  --tone-strong: #e4f4e5;
+  --tone-button: #edf7ed;
+  --tone-hover: #dcefdc;
+  --tone-danger: #f9ecec;
+  --tone-overdue: #fdeeee;
+  --overlay-bg: rgba(25, 40, 30, 0.16);
 }
 
 *,
@@ -108,13 +120,13 @@ select:focus,
 .btn.primary {
   color: var(--primary) !important;
   border-color: var(--primary) !important;
-  background: #072212 !important;
+  background: var(--tone-strong) !important;
 }
 
 .btn.danger {
   color: #ffb4af !important;
   border-color: #8a2d2a !important;
-  background: #1a0b0b !important;
+  background: var(--tone-danger) !important;
 }
 
 .topbar {
@@ -169,7 +181,7 @@ select:focus,
   padding: 4px 10px !important;
   border: 1px solid var(--line) !important;
   border-radius: 0 !important;
-  background: #03120a !important;
+  background: var(--tone-button) !important;
   color: var(--text) !important;
   text-decoration: none !important;
   font-size: 12px !important;
@@ -179,7 +191,7 @@ select:focus,
 .module-btn.is-active,
 .module-btn[aria-current="page"] {
   border-color: var(--primary) !important;
-  background: #072212 !important;
+  background: var(--tone-strong) !important;
 }
 
 .home-shell {
@@ -321,7 +333,7 @@ select:focus,
   height: 38px !important;
   border: 1px solid var(--line) !important;
   border-radius: 0 !important;
-  background: #072212 !important;
+  background: var(--tone-strong) !important;
   color: var(--primary) !important;
   box-shadow: none !important;
 }
@@ -345,7 +357,7 @@ select:focus,
 
 .link-tile:hover,
 .more-links a:hover {
-  background: #05170d !important;
+  background: var(--tone-hover) !important;
   border-color: var(--primary) !important;
 }
 
@@ -369,7 +381,7 @@ select:focus,
   border: 1px solid var(--line-soft) !important;
   border-radius: 0 !important;
   color: var(--text) !important;
-  background: #072212 !important;
+  background: var(--tone-strong) !important;
 }
 
 .badge.p1,
@@ -440,7 +452,7 @@ select:focus,
 
 .task.overdue {
   border-color: #8a2d2a !important;
-  background: #130707 !important;
+  background: var(--tone-overdue) !important;
 }
 
 .collapsible {
@@ -466,7 +478,7 @@ select:focus,
   border: 1px solid var(--line-soft) !important;
   border-radius: 0 !important;
   color: var(--text) !important;
-  background: #072212 !important;
+  background: var(--tone-strong) !important;
 }
 
 .calendar-task-card {
@@ -488,7 +500,7 @@ select:focus,
 }
 
 .shortcuts-panel {
-  background: rgba(0, 0, 0, 0.72) !important;
+  background: var(--overlay-bg) !important;
 }
 
 .filters {

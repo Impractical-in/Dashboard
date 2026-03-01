@@ -1,6 +1,6 @@
 {
   "name": "local-dashboard",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Terminal-style local dashboard with optional server sync and backup workflows.",
   "license": "MIT",

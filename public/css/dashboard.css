@@ -401,6 +401,87 @@ option {
   color: var(--muted);
 }
 
+.calendar-dash-help {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calendar-dash-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.calendar-dash-link {
+  font-size: 11px;
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--text);
+}
+
+.calendar-dash-link:hover {
+  border-color: var(--primary);
+}
+
+.calendar-patch-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.calendar-patch-note {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calendar-patch-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(6, 16, 28, 0.95);
+  padding: 8px;
+  min-height: 92px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.calendar-patch-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.calendar-patch-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calendar-patch-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.calendar-patch-rank {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: auto;
+}
+
+.calendar-patch-empty {
+  border-style: dashed;
+  color: var(--muted);
+  place-items: center;
+  text-align: center;
+}
+
 .calendar-dash-board {
   position: relative;
   width: 100%;
@@ -783,6 +864,10 @@ textarea {
   .issue-filter-row select:last-child {
     grid-column: 1 / -1;
   }
+
+  .calendar-patch-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -827,6 +912,10 @@ textarea {
 
   .issue-filter-row {
     grid-template-columns: auto 1fr;
+  }
+
+  .calendar-patch-grid {
+    grid-template-columns: 1fr;
   }
 }
 

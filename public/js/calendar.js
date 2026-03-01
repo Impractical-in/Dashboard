@@ -815,6 +815,18 @@ function renderDayDetails(items) {
   });
 }
 
+function colorTextForBackground(colorValue) {
+  const value = String(colorValue || "").trim();
+  const match = value.match(/^#([0-9a-fA-F]{6})$/);
+  if (!match) return "#ffffff";
+  const hex = match[1];
+  const r = Number.parseInt(hex.slice(0, 2), 16);
+  const g = Number.parseInt(hex.slice(2, 4), 16);
+  const b = Number.parseInt(hex.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.62 ? "#17212f" : "#ffffff";
+}
+
 function renderCalendar() {
   const scheduleMap = buildScheduleMap();
   const start = startOfWeek(new Date(viewDate.getFullYear(), viewDate.getMonth(), 1));
@@ -841,8 +853,10 @@ function renderCalendar() {
       ${timedItems
         .slice(0, 2)
         .map(
-          (item) =>
-            `<div class="timed ${String(item.type).toLowerCase()}" style="${item.customColor ? `background:${item.customColor};border-color:${item.customColor};color:#fff;` : ""}">${item.time ? `${item.time} ` : ""}${item.title}</div>`
+          (item) => {
+            const textColor = colorTextForBackground(item.customColor);
+            return `<div class="timed ${String(item.type).toLowerCase()}" style="${item.customColor ? `background:${item.customColor};border-color:${item.customColor};color:${textColor};` : ""}">${item.time ? `${item.time} ` : ""}${item.title}</div>`;
+          }
         )
         .join("")}
     `;
@@ -1011,7 +1025,7 @@ function renderWeekView() {
           if (item.customColor) {
             block.style.background = item.customColor;
             block.style.borderColor = item.customColor;
-            block.style.color = "#ffffff";
+            block.style.color = colorTextForBackground(item.customColor);
           }
           if (item.seriesId) block.classList.add("series-item");
           if (item.timed) {

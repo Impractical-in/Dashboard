@@ -425,6 +425,12 @@ function init() {
 
 initStorage().then(init);
 
+if (typeof window !== "undefined") {
+  window.addEventListener("dashboard-theme-change", () => {
+    updateDisplay();
+  });
+}
+
 function updateAudioSource() {
   const source = audioFileInput.value.trim();
   audioPlayer.src = source;
